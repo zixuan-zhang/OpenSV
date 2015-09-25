@@ -46,8 +46,8 @@ def data_test(fileName):
     preProcessor = PreProcessor()
     preProcessor.duplicated_point_split(X, Y, T=T)
     R = dataProcessor.radius(X, Y)
-    VX = dataProcessor.velocity(X, T)
-    VY = dataProcessor.velocity(Y, T)
+    VX = dataProcessor.velocity_of_x(X, T)
+    VY = dataProcessor.velocity_of_y(Y, T)
     AV = dataProcessor.abs_velocity(VX, VY)
 
 if __name__ == "__main__":

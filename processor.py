@@ -101,6 +101,66 @@ class PreProcessor(object):
 class DataProcessor(object):
 
     """
+    @Des: This class implemented some signals generated from X, Y, P
+
+    @Introduction:
+        X for x axis
+        Y for y axis
+        V for velocity
+        A for absolute or acceleration
+        tan for angle
+        sin for sinuous
+        cos for cosine
+        T for Tangential
+        C for centripetal
+        J for jerk
+
+
+    @Detail Table:
+    1. X    : coordinate of x axis
+    2. Y    : coordinate of y axis
+    3. R    : absolute position r
+    4. VX   : velocity in x axis
+    5. VY   : velocity in y axis
+    6. AV   : absolute velocity
+    7. VR   : velocity of absolute position r
+    8. tanV : angle of velocity
+    9. sinV : sinuous of angle velocity
+    10.cosV : cosine of angle velocity
+    11.AX   : acceleration of x axis
+    12.AY   : acceleration of y axis
+    13.AA   : absolute acceleration
+    14.TA   : tangential acceleration
+    15.CA   : centripetal acceleration
+    16.AR   : acceleration of r
+    17.tanA : angle of acceleration
+    18.sinA : sinuous of angle acceleration
+    19.cosA : cosine of angle acceleration
+    20.tanCA: angle of centripetal acceleration
+    21.
+    22.
+    23.JX   : jerk in x
+    24.JY   : jerk in y
+    25.AJ   : absolute jerk
+    26.TJ   : tangential jerk
+    27.CJ   : centripetal jerk
+    28.JR   : jerk in r
+    29.tanJ : angle of jerk
+    30.sinJ : sinuous of angle jerk
+    31.cosJ : cosine of angle jerk
+    32.tanCJ: angle of centripetal jerk
+    33. 
+    34.
+    35.P    : pressure
+    36.VP   : velocity of pressure
+    37.AP   : acceleration of pressure
+    38.
+    39.
+    40.
+    41.
+    42.
+    43.
+    44.Cur: curvature
     """
 
     def __init__(self):
@@ -137,7 +197,8 @@ class DataProcessor(object):
                      Y for y axis # list
             @output: R for radius # list
         """
-        return self._sqrt(X, Y)
+        R = self._sqrt(X, Y)
+        return R
 
     @param_length_matcher
     def velocity_of_x(self, X, T):
@@ -177,13 +238,15 @@ class DataProcessor(object):
             @num   : 7
         """
         VR = self._derivative(R, T)
+        return AR
 
     @param_length_matcher
-    def angle_of_velocity(self, VY, VX):
+    def angle_of_velocity(self, VX, VY):
         """
             @num   : 8
         """
-        pass
+        tanV = self._divisor(VY, VX)
+        return tanV
 
     @param_length_matcher
     def sin_of_angle_v(self, VY, VR):
@@ -214,21 +277,24 @@ class DataProcessor(object):
         """
             @num   : 11
         """
-        return self._derivative(VX, T)
+        AX = self._derivative(VX, T)
+        return AX
 
     @param_length_matcher
     def acc_of_vy(self, VY, T):
         """
             @num   : 12
         """
-        return self._derivative(VY, T)
+        AY = self._derivative(VY, T)
+        return AY
         
     @param_length_matcher
     def abs_acc(self, AX, AY):
         """
             @num   : 13
         """
-        return self._sqrt(AX, AY)
+        AA = self._sqrt(AX, AY)
+        return AA
 
     @param_length_matcher
     def tan_acc(self, VX, AX, VY, AY, VR):
@@ -244,6 +310,7 @@ class DataProcessor(object):
             @num   : 15
         """
         CA = [(VX[i]*AY[i]-VY[i]*AX[i])/VR[i] for i in range(VX)]
+        return CA
 
     @param_length_matcher
     def acc_of_radius(self, VR, T):
@@ -254,34 +321,37 @@ class DataProcessor(object):
         return AR
 
     @param_length_matcher
-    def angle_of_acc(self, AY, AX):
+    def angle_of_acc(self, AX, AY):
         """
             @num   : 17
         """
-        pass
+        tanA = self._divisor(AY, AX)
+        return tanA
 
     @param_length_matcher
     def sin_of_angle_a(self, AY, AR):
         """
             @num   : 18
         """
-        sinOfAngle = self._derivative(AY, AR)
-        return sinOfAngle
+        sinA = self._derivative(AY, AR)
+        return sinA
 
     @param_length_matcher
     def cos_of_angle_a(self, AX, AR):
         """
             @num   : 19
         """
-        cosOfAngle = self._derivative(AX, AR)
-        return cosOfAngle
+        cosA = self._derivative(AX, AR)
+        return cosA
 
     @param_length_matcher
-    def angle_of_centripetal_acc(self, AY, AX):
+    def angle_of_centripetal_acc(self, AX, AY):
         """
             @num   : 20
         """
-        pass
+        tanCA = self._divisor(AY, AX)
+        return tanCA
+        
     
     @param_length_matcher
     def sin_of_angle_b(self, AC, AR):
@@ -318,8 +388,8 @@ class DataProcessor(object):
         """
             @num   : 25
         """
-        absJerk = self._sqrt(JX, JY)
-        return absJerk
+        AJ = self._sqrt(JX, JY)
+        return AJ
 
     @param_length_matcher
     def tan_jerk(self, AX, JX, AY, JY, AR):
@@ -350,7 +420,7 @@ class DataProcessor(object):
         """
             @num   : 29
         """
-        pass
+        tanJ = self._divisor(JY, JX)
 
     @param_length_matcher
     def sin_of_angle_jerk(self, JY, JR):
@@ -411,7 +481,8 @@ class DataProcessor(object):
             @num   : 44
         """
         tempList = [VX[i]*AX[i]*VY[i]*AY[i]/VR[i]/pow(VR[i], 3) for i in range(len(VX))]
-        return numpy.log(tempList)
+        Cur = numpy.log(tempList)
+        return Cur
 
 if __name__ == "__main__":
     processor = PreProcessor()
