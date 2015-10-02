@@ -29,6 +29,27 @@ class PreProcessor(object):
             @ gauss_smoothing
             @ strip_zero
     """
+
+    def signature_segmentation(self, T, X, Y, P):
+        """
+            将数据根据零点进行分段
+        """
+        indexes = [0]
+        for i in range(len(T) - 1):
+            if (T[i+1] - T[i]) > 10:
+                indexes.append(i+1)
+        indexes.append(len(T)-1)
+        segmentsT = []
+        segmentsX = []
+        segmentsY = []
+        segmentsP = []
+        for i in range(len(indexes)-1):
+            segmentsT.append(T[indexes[i]:indexes[i+1]])
+            segmentsX.append(X[indexes[i]:indexes[i+1]])
+            segmentsY.append(Y[indexes[i]:indexes[i+1]])
+            segmentsP.append(P[indexes[i]:indexes[i+1]])
+        return segmentsT, segmentsX, segmentsY, segmentsP
+
     def location_normalization(self, X, Y):
         """
             将位置归一化到原点
@@ -100,6 +121,34 @@ class PreProcessor(object):
 
 class DataProcessor(object):
 
+    def __init__(self):
+        pass
+
+    def _sqrt(self, A, B):
+        """
+            平方根局部函数
+        """
+        C = [numpy.sqrt(pow(A[i], 2) + pow(B[i], 2)) for i in range(len(A))]
+        return C
+
+    def _derivative(self, A, T):
+        """
+            求导数子函数
+        """
+        D = [(A[i+1]-A[i])/(T[i+1]-T[i]) for i in range(len(A)-1)]
+        D.append(D[-1]) #为了保证D的结果与A和T长度一致
+        return D
+
+    def _divisor(self, A, B):
+        """
+            除法子函数
+        """
+        D = [A[i] / B[i] for i in range(len(A))]
+        return D
+
+
+class DCTProcessor(DataProcessor):
+
     """
     @Des: This class implemented some signals generated from X, Y, P
 
@@ -163,31 +212,6 @@ class DataProcessor(object):
     44.Cur: curvature
     """
 
-    def __init__(self):
-        pass
-
-    def _sqrt(self, A, B):
-        """
-            平方根局部函数
-        """
-        C = [numpy.sqrt(pow(A[i], 2) + pow(B[i], 2)) for i in range(len(A))]
-        return C
-
-    def _derivative(self, A, T):
-        """
-            求导数子函数
-        """
-        D = [(A[i+1]-A[i])/(T[i+1]-T[i]) for i in range(len(A)-1)]
-        D.appen(D[-1]) #为了保证D的结果与A和T长度一致
-        return D
-
-    def _divisor(self, A, B):
-        """
-            除法子函数
-        """
-        D = [A[i] / B[i] for i in range(len(A))]
-        return D
-
     @param_length_matcher
     def radius(self, X, Y):
         """
@@ -238,7 +262,7 @@ class DataProcessor(object):
             @num   : 7
         """
         VR = self._derivative(R, T)
-        return AR
+        return VR
 
     @param_length_matcher
     def angle_of_velocity(self, VX, VY):
@@ -483,6 +507,162 @@ class DataProcessor(object):
         tempList = [VX[i]*AX[i]*VY[i]*AY[i]/VR[i]/pow(VR[i], 3) for i in range(len(VX))]
         Cur = numpy.log(tempList)
         return Cur
+
+class SVMProcessor(DataProcessor):
+
+    def _abs(self, ListV):
+        ListAbsV = [[abs(v) for v in V] for V in ListV]
+        return ListAbsV
+
+    def _velocity_of_list(self, ListA, ListT):
+        ListV = []
+        for i in range(len(ListA)):
+            V = self._derivative(ListA[i], ListT[i])
+            ListV.append(V)
+        return ListV
+
+    def _acc_of_v(self, ListV, ListT):
+        ListA = []
+        for i in range(len(ListV)):
+            A = self._derivative(ListV[i], ListT[i])
+            ListA.append(A)
+        return ListA
+
+    @param_length_matcher
+    def radius(self, ListX, ListY):
+        """
+            @num   : 3
+            @output: R for radius # list
+        """
+        ListR = []
+        for i in range(len(ListX)):
+            R = self._sqrt(ListX[i], ListY[i])
+            ListR.append(R)
+        return ListR
+
+    @param_length_matcher
+    def velocity_of_x(self, ListX, ListT):
+        """
+            @num   : 4
+            @output: V for velocity
+        """
+        ListVX = self._velocity_of_list(ListX, ListT)
+        return ListVX
+
+    @param_length_matcher
+    def velocity_of_y(self, ListY, ListT):
+        """
+            @num   : 5
+        """
+        ListVY = self._velocity_of_list(ListY, ListT)
+        return ListVY
+
+    @param_length_matcher
+    def velocity_of_r(self, ListR, ListT):
+        """
+            @num   : 6
+        """
+        ListVR = self._velocity_of_list(ListR, ListT)
+        return ListVR
+
+    @param_length_matcher
+    def abs_velocity_of_x(self, ListVX):
+        """
+            @num   : 7
+        """
+        ListAbsVX = self._abs(ListVX)
+        return ListAbsVX
+
+    @param_length_matcher
+    def abs_velocity_of_y(self, ListVY):
+        """
+            @num   : 8
+        """
+        ListAbsVY = self._abs(ListVY)
+        return ListAbsVY
+
+    @param_length_matcher
+    def abs_velocity_of_r(self, ListVR):
+        """
+            @num   : 9
+        """
+        ListAbsVR = self._abs(ListVR)
+        return ListAbsVR
+
+    @param_length_matcher
+    def acc_of_vx(self, ListVX, ListT):
+        """
+            @num   : 10 
+        """
+        ListAX = self._acc_of_v(ListVX, ListT)
+        return ListAX
+
+    @param_length_matcher
+    def acc_of_vy(self, ListVY, ListT):
+        """
+            @num   : 11
+        """
+        ListAY = self._acc_of_v(ListVY, ListT)
+        return ListAY
+
+    @param_length_matcher
+    def acc_of_vr(self, ListVR, ListT):
+        """
+            @num   : 12
+        """
+        ListAR = self._acc_of_v(ListVR, ListT)
+        return ListAR
+
+    @param_length_matcher
+    def abs_acc_of_x(self, ListAX):
+        """
+            @num   : 13
+        """
+        ListAbsAX = self._abs(ListAX)
+        return ListAbsAX
+
+    def abs_acc_of_y(self, ListAY):
+        """
+            @num   : 14
+        """
+        ListAbsAY = self._abs(ListAY)
+        return ListAbsAY
+
+    def abs_acc_of_r(self, ListAR):
+        """
+            @num   : 15
+        """
+        ListAbsAR = self._abs(ListAR)
+        return ListAbsAR
+
+    def velocity_of_p(self, ListP, ListT):
+        """
+            @num   : 17
+        """
+        ListVP = self._velocity_of_list(ListP, ListT)
+        return ListVP
+
+    def abs_velocity_of_p(self, ListVP):
+        """
+            @num   : 18
+        """
+        ListAbsVP = self._abs(ListVP)
+        return ListAbsVP
+
+    @param_length_matcher
+    def abs_velocity(self, ListVX, ListVY):
+        """
+            @num   : 6
+            @des   : calculate absolute velocity
+            @input : VX for x axis velocity 
+                   : VY for y axis velocity
+            @output: AV for absolute velocity
+        """
+        ListAV = []
+        for i in range(len(ListVX)):
+            AV = self._sqrt(ListVX[i], ListVY[i])
+            ListAV.append(AV)
+        return ListAV
 
 if __name__ == "__main__":
     processor = PreProcessor()
