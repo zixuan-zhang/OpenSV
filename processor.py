@@ -63,7 +63,7 @@ class PreProcessor(object):
         resultY = [mY * (y - minY) / rangeY for y in Y]
         return resultX, resultY
 
-    def gauss_smoothing(self, params):
+    def gauss_smoothing(self, *params):
         """
             使用高斯滤波平滑数据
         """
@@ -99,6 +99,7 @@ class PreProcessor(object):
                 for param in args:
                     param.pop(indexes[i] - i)
                 T.pop(indexes[i] - i)
+
     def signature_segmentation(self, T, X, Y, P):
         """
             将数据根据零点进行分段
@@ -538,8 +539,8 @@ class SVMProcessor(DataProcessor):
         ListR = []
         for i in range(len(ListX)):
             R = []
-            for j in range(len(X[i] - 1)):
-                R.append(numpy.sqrt(pow(X[i][j+1]-X[i][j]) + pow(Y[i][j+1]-Y[i][j])))
+            for j in range(len(ListX[i] - 1)):
+                R.append(numpy.sqrt(pow(ListX[i][j+1]-ListX[i][j]) + pow(ListY[i][j+1]-ListY[i][j])))
             ListR.append(R)
         return ListR
 

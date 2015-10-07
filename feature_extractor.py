@@ -502,5 +502,6 @@ class SVMFeatureExtractor(FeatureExtractor):
         self.features_of_zero(ListVX, ListVY, ListAX, ListAY)
         self.features_of_acceleration(ListAR, ListAX, ListAY)
         self.features_of_curve(ListX, ListY)
-
-
+    
+    def display_features(self):
+        print self.svmFeature
