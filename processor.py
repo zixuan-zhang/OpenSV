@@ -536,7 +536,9 @@ class SVMProcessor(DataProcessor):
         """
         ListR = []
         for i in range(len(ListX)):
-            R = self._sqrt(ListX[i], ListY[i])
+            R = []
+            for j in range(len(X[i] - 1)):
+                R.append(numpy.sqrt(pow(X[i][j+1]-X[i][j]) + pow(Y[i][j+1]-Y[i][j])))
             ListR.append(R)
         return ListR
 
@@ -562,7 +564,13 @@ class SVMProcessor(DataProcessor):
         """
             @num   : 6
         """
-        ListVR = self._velocity_of_list(ListR, ListT)
+        # TODO: equation error
+        #ListVR = self._velocity_of_list(ListR, ListT)
+        ListVR = []
+        for i in range(ListR):
+            R = [ListR[i][j] / (ListT[i][j+1]-ListT[i][j]) for j in range(ListR[i] - 1)]
+            R.append(R[-1])
+            ListVR.append(R)
         return ListVR
 
     @param_length_matcher

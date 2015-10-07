@@ -106,6 +106,26 @@ class SVMFeatureExtractor(FeatureExtractor):
 
         self.svmFeature = SVMFeature()
 
+    def _points_lt_zero(self, ListA):
+        cnt = 0
+        for A in ListA:
+            for a in A:
+                if a < 0:
+                    cnt += 1
+        return cnt
+
+    def _points_gt_zero(self, ListA):
+        cnt = 0
+        for A in ListA:
+            for a in A:
+                if a > 0:
+                    cnt += 1
+        return cnt
+
+    def features_of_velocity(self, ListVX, ListVY, ListVR):
+        """
+            velocity related features
+        """
         # 将ListVX, ListVY, ListVR保存
         self.ListVX = ListVX
         self.ListVY = ListVY
@@ -149,34 +169,14 @@ class SVMFeatureExtractor(FeatureExtractor):
         self.stdVX = self._std(ListVX)
         self.stdVY = self._std(ListVY)
 
-        ListAbsVX = SVMProcessor.abs_velocity_of_x(ListVX)
-        ListAbsVY = SVMProcessor.abs_velocity_of_y(ListVY)
+        ListAbsVX = SVMProcessor.abs_velocity_of_x(SVMProcessor, ListVX)
+        ListAbsVY = SVMProcessor.abs_velocity_of_y(SVMProcessor, ListVY)
         self.avgAbsVX = self._avg(ListAbsVX)
         self.avgAbsVY = self._avg(ListAbsVY)
 
         self.stdAbsVX = self._std(ListAbsVX)
         self.stdAbsVY = self._std(ListAbsVY)
 
-    def _points_lt_zero(self, ListA):
-        cnt = 0
-        for A in ListA:
-            for a in A:
-                if a < 0:
-                    cnt += 1
-        return cnt
-
-    def _points_gt_zero(self, ListA):
-        cnt = 0
-        for A in ListA:
-            for a in A:
-                if a > 0:
-                    cnt += 1
-        return cnt
-
-    def gen_features(self):
-        """
-            generate features
-        """
         self.svmFeature.append(self.avgVX) # 1
         self.svmFeature.append(self.avgVY) # 2
         self.svmFeature.append(self.stdVX) # 3
@@ -223,3 +223,284 @@ class SVMFeatureExtractor(FeatureExtractor):
         self.svmFeature.append(self._points_gt_zero(self.ListVY)) # 44
         self.svmFeature.append(self.maxNegVX) # 45
         self.svmFeature.append(self.maxNegVY) # 46
+
+    def features_of_time(self, ListT, ListVX, ListVY):
+
+        """
+            time related features
+        """
+        self.penUpTimes = len(ListT)
+        self.totalTime = ListT[-1][-1] - ListT[0][0]
+        self.maxPenDownTime = -1
+        self.minPenDownTime = 99999
+        self.totalPenDownTime = 0
+        self.totalPenUpTime = 0
+        for T in ListT:
+            penDownTime = T[-1] - T[0]
+            self.maxPenDownTime = max(self.maxPenDownTime, penDownTime)
+            self.minPenDownTime = min(self.minPenDownTime, penDownTime)
+            self.totalPenDownTime += penDownTime
+        self.totalPenUpTime = self.totalTime - self.totalPenDownTime
+        self.totalPosVXTime = 0
+        self.totalNegVXTime = 0
+        self.totalPosVYTime = 0
+        self.totalNegVYTime = 0
+        for VX in ListVX:
+            for vx in VX:
+                if vx > 0:
+                    self.totalPosVXTime += 10
+                elif vx < 0:
+                    self.totalNegVXTime += 10
+        for VY in ListVY:
+            for vy in VY:
+                if vy > 0:
+                    self.totalPosVYTime += 10
+                elif vy < 0:
+                    self.totalNegVYTime += 10
+
+        self.svmFeature.append(self.penUpTimes) # 47
+        self.svmFeature.append(self.totalTime) # 48
+        self.svmFeature.append(self.maxPenDownTime / self.totalTime) # 49
+        self.svmFeature.append(self.minPenDownTime / self.totalTime) # 50
+        self.svmFeature.append(self.totalPenDownTime / self.totalTime) # 51
+        self.svmFeature.append(self.totalPenUpTime / self.totalTime) # 52
+        self.svmFeature.append(self.totalPenDownTime) # 53
+        self.svmFeature.append(self.totalPosVXTime / self.totalPosVYTime) # 54
+        self.svmFeature.append(self.totalNegVYTime / self.totalNegVYTime) # 55
+        self.svmFeature.append(self.totalPosVXTime / self.totalTime) # 56
+        self.svmFeature.append(self.totalPosVYTime / self.totalTime) # 57
+        self.svmFeature.append(self.totalNegVXTime / self.totalTime) # 58
+        self.svmFeature.append(self.totalNegVYTime / self.totalTime) # 59
+
+    def features_of_shape(self, ListX, ListY, ListR):
+        """
+            shape related features
+        """
+        maxX = self._max(ListX)
+        minX = self._min(ListX)
+        maxY = self._max(ListY)
+        minY = self._min(ListY)
+
+        shiftX = 0
+        shiftY = 0
+        shiftR = 0
+        shiftPosX = 0
+        shiftPosY = 0
+        for X in ListX:
+            for i in range(len(X) - 1):
+                delta = X[i+1] - X[i]
+                shiftX += abs(delta)
+                if delta > 0:
+                    shiftPosX += delta
+
+        for Y in ListY:
+            for i in range(len(Y) - 1):
+                delta += Y[i+1] - Y[i]
+                shiftY += abs(delta)
+                if delta > 0:
+                    shiftPosY += delta
+
+        for R in ListR:
+            for r in R:
+                shiftR += r
+
+        totalPointsCnt = 0
+        pointsCntIn1stQ = 0
+        pointsCntIn2ndQ = 0
+        pointsCntIn3rdQ = 0
+        pointsCntIn4thQ = 0
+
+        for X in ListX:
+            totalPointsCnt += len(X)
+        for i in range(len(ListX)):
+            for j in range(len(ListX[i])):
+                if ListX[i][j] >= 0:
+                    if ListY[i][j] >= 0:
+                        pointsCntIn1stQ += 1
+                    else:
+                        pointsCntIn4thQ += 1
+                else:
+                    if ListY[i][j] >= 0:
+                        pointsCntIn2ndQ += 1
+                    else:
+                        pointsCntIn3rdQ += 1
+
+        self.svmFeature.append((maxX - minX) / (maxY - minY)) # 60
+        self.svmFeature.append(shiftX / shiftR) # 61
+        self.svmFeature.append(shiftY / shiftR) # 62
+        self.svmFeature.append((maxX - minX) * (maxY - minY)) # 63
+        self.svmFeature.append(shiftR) # 64
+        self.svmFeature.append(pointsCntIn1stQ) # 65
+        self.svmFeature.append(pointsCntIn2ndQ) # 66
+        self.svmFeature.append(pointsCntIn3rdQ) # 67
+        self.svmFeature.append(pointsCntIn4thQ) # 68
+        self.svmFeature.append(0) # 69 ######TODO#######
+        self.svmFeature.append(shiftR / ((maxX - minX) * (maxY - minY))) # 70
+        self.svmFeature.append(shiftPosX / shiftX) # 71
+        self.svmFeature.append(shiftPosY / shiftY) # 72
+
+    def features_of_pression(self, ListP, ListVP):
+        """
+            pression related features
+        """
+        avgP = self._avg(ListP)
+        minP = self._min(ListP)
+        maxP = self._max(ListP)
+        stdP = self._std(ListP)
+        stdVP = self._std(ListVP)
+        cntGtAvg = 0
+        cntLtAvg = 0
+        for P in ListP:
+            for p in P:
+                if p > avgP:
+                    cntGtAvg += 1
+                else:
+                    cntLtAvg += 1
+        
+        self.svmFeature.append(avgP) # 73
+        self.svmFeature.append(minP) # 74
+        self.svmFeature.append(stdP) # 75
+        self.svmFeature.append(stdVP) # 76
+        self.svmFeature.append(avgP / maxP) # 77
+        self.svmFeature.append(cntGtAvg) # 78
+        self.svmFeature.append(cntLtAvg) # 79
+
+    def features_of_zero(self, ListVX, ListVY, ListAX, ListAY):
+        """
+            features about zero
+        """
+        totalCnt = 0.0
+        for VX in ListVX:
+            totalCnt += len(VX)
+        pointsCntZeroVX = 0
+        pointsCntZeroVY = 0
+        pointsCntZeroAX = 0
+        pointsCntZeroAY = 0
+        for VX in ListVX:
+            for i in range(len(VX) - 1):
+                if VX[i]*VX[i+1] < 0 or VX[i] == 0:
+                    pointsCntZeroVX += 1
+        for VY in ListVY:
+            for i in range(len(VY) - 1):
+                if VY[i]*VY[i+1] < 0 or VY[i] == 0:
+                    pointsCntZeroVY += 1
+        
+        for AX in ListAX:
+            for i in range(len(AX) - 1):
+                if AX[i]*VX[i+1] < 0 or AX[i] == 0:
+                    pointsCntZeroAX += 1
+        for AY in ListAY:
+            for i in range(len(AY) - 1):
+                if AY[i]*AY[i+1] < 0 or AY[i] == 0:
+                    pointsCntZeroAY += 1
+        
+        self.svmFeature.append(pointsCntZeroVX / totalCnt) # 80
+        self.svmFeature.append(pointsCntZeroVY / totalCnt) # 81
+        self.svmFeature.append(pointsCntZeroAX / totalCnt) # 82
+        self.svmFeature.append(pointsCntZeroAY / totalCnt) # 83
+        self.svmFeature.append(0) # 84 ####TODO####
+        self.svmFeature.append(0) # 85 ####TODO####
+        self.svmFeature.append(0) # 86 ####TODO####
+        self.svmFeature.append(0) # 87 ####TODO####
+        
+
+    def features_of_acceleration(self, ListAR, ListAX, ListAY):
+        """
+        acceleration related features
+        """
+        maxAR = self._max(ListAR)
+        maxAX = self._max(ListAX)
+        maxAY = self._max(ListAY)
+        minAR = self._min(ListAR)
+        minAX = self._min(ListAX)
+        minAY = self._min(ListAY)
+        avgAR = self._avg(ListAR)
+        avgAX = self._avg(ListAX)
+        avgAY = self._avg(ListAY)
+        stdAX = self._std(ListAX)
+        stdAY = self._std(ListAY)
+        avgPosAX = numpy.mean(self._select_positive(ListAX))
+        avgPosAY = numpy.mean(self._select_positive(ListAY))
+        avgNegAX = numpy.nean(self._select_negative(ListAX))
+        avgNegAY = numpy.mean(self._select_negative(ListAY))
+        ListAbsAX = SVMProcessor.abs_acc_of_x(SVMProcessor, ListAX)
+        ListAbsAY = SVMProcessor.abs_acc_of_y(SVMProcessor, ListAY)
+        avgAbsAX = self._avg(ListAbsAX)
+        avgAbsAY = self._avg(ListAbsAY)
+        maxAbsAX = self._max(ListAbsAX)
+        maxAbsAY = self._max(ListAbsAY)
+        stdAbsAX = self._std(ListAbsAX)
+        stdAbsAY = self._std(ListAbsAY)
+        pointsCntGtZeroAX = self._points_gt_zero(ListAX)
+        pointsCntLtZeroAX = self._points_lt_zero(ListAX)
+        pointsCntGtZeroAY = self._points_gt_zero(ListAY)
+        pointsCntLtZeroAY = self._points_lt_zero(ListAY)
+        
+        self.svmFeature.append(maxAR) # 88
+        self.svmFeature.append(avgAR) # 89
+        self.svmFeature.append(0) # 90 ####TODO####
+        self.svmFeature.append(0) # 91 ####TODO####
+        self.svmFeature.append(stdAX) # 92
+        self.svmFeature.append(stdAY) # 93
+        self.svmFeature.append(avgAbsAX / maxAbsAX) # 94
+        self.svmFeature.append(avgAbsAY / maxAbsAY) # 95
+        self.svmFeature.append(avgAX / self.avgPosVX) # 96
+        self.svmFeature.append(avgAY / self.avgPosVY) # 97
+        self.svmFeature.append(avgAR / self.maxVR) # 98
+        self.svmFeature.append(minAR / self.avgVR) # 99
+        self.svmFeature.append(minAY / avgAY) # 100
+        self.svmFeature.append(avgPosAX / avgNegAX) # 101
+        self.svmFeature.append(maxAR / self.avgPosVX) # 102
+        self.svmFeature.append(maxAR / self.avgPosVY) # 103
+        self.svmFeature.append(maxAR / self.avgNegVX) # 104
+        self.svmFeature.append(maxAR / self.avgNegVY) # 105
+        self.svmFeature.append(minAR / self.avgPosVX) # 106
+        self.svmFeature.append(minAR / self.avgPosVY) # 107
+        self.svmFeature.append(minAR / self.avgNegVX) # 108
+        self.svmFeature.append(minAR / self.avgNegVY) # 109
+        self.svmFeature.append(avgNegAY / avgPosAY) # 110
+        self.svmFeature.append(avgAR / self.avgNegVX) # 111
+        self.svmFeature.append(avgAR / self.avgNegVY) # 112
+        self.svmFeature.append(avgAbsAX) # 113
+        self.svmFeature.append(avgAbsAY) # 114
+        self.svmFeature.append(stdAbsAX) # 115
+        self.svmFeature.append(stdAbsAY) # 116
+        self.svmFeature.append(maxAX) # 117
+        self.svmFeature.append(minAX) # 118
+        self.svmFeature.append(maxAY) # 119
+        self.svmFeature.append(minAY) # 120
+        self.svmFeature.append(avgAX) # 121
+        self.svmFeature.append(avgAY) # 122
+        self.svmFeature.append(pointsCntGtZeroAX) # 123
+        self.svmFeature.append(pointsCntLtZeroAX) # 124
+        self.svmFeature.append(pointsCntGtZeroAY) # 125
+        self.svmFeature.append(pointsCntLtZeroAY) # 126
+
+    def features_of_curve(self, ListX, ListY):
+        """
+            signature curve related features
+        """
+        avgX = self._avg(ListX)
+        avgY = self._avg(ListY)
+        stdX = self._std(ListX)
+        stdY = self._std(ListY)
+
+        self.svmFeature.append(avgX) # 127
+        self.svmFeature.append(avgY) # 128
+        self.svmFeature.append(stdX) # 129
+        self.svmFeature.append(stdY) # 130
+
+    def generate_features(self, ListT, ListX, ListY, ListR, ListP,
+            ListVX, ListVY, ListVR, ListVP, ListAX, ListAY, ListAR):
+        """
+            driver to generate features
+        """
+        self.features_of_velocity(ListVX, ListVY, ListVR)
+        self.features_of_time(ListT, ListVX, ListVY)
+        self.features_of_shape(ListX, ListY, ListR)
+        self.features_of_pression(ListP, ListVP)
+        self.features_of_zero(ListVX, ListVY, ListAX, ListAY)
+        self.features_of_acceleration(ListAR, ListAX, ListAY)
+        self.features_of_curve(ListX, ListY)
+
+
