@@ -28,27 +28,8 @@ class PreProcessor(object):
             @ size_normalization
             @ gauss_smoothing
             @ strip_zero
+            @ duplicated_point_split
     """
-
-    def signature_segmentation(self, T, X, Y, P):
-        """
-            将数据根据零点进行分段
-        """
-        indexes = [0]
-        for i in range(len(T) - 1):
-            if (T[i+1] - T[i]) > 10:
-                indexes.append(i+1)
-        indexes.append(len(T)-1)
-        segmentsT = []
-        segmentsX = []
-        segmentsY = []
-        segmentsP = []
-        for i in range(len(indexes)-1):
-            segmentsT.append(T[indexes[i]:indexes[i+1]])
-            segmentsX.append(X[indexes[i]:indexes[i+1]])
-            segmentsY.append(Y[indexes[i]:indexes[i+1]])
-            segmentsP.append(P[indexes[i]:indexes[i+1]])
-        return segmentsT, segmentsX, segmentsY, segmentsP
 
     def location_normalization(self, X, Y):
         """
@@ -118,6 +99,26 @@ class PreProcessor(object):
                 for param in args:
                     param.pop(indexes[i] - i)
                 T.pop(indexes[i] - i)
+    def signature_segmentation(self, T, X, Y, P):
+        """
+            将数据根据零点进行分段
+        """
+        indexes = [0]
+        for i in range(len(T) - 1):
+            if (T[i+1] - T[i]) > 10:
+                indexes.append(i+1)
+        indexes.append(len(T)-1)
+        segmentsT = []
+        segmentsX = []
+        segmentsY = []
+        segmentsP = []
+        for i in range(len(indexes)-1):
+            segmentsT.append(T[indexes[i]:indexes[i+1]])
+            segmentsX.append(X[indexes[i]:indexes[i+1]])
+            segmentsY.append(Y[indexes[i]:indexes[i+1]])
+            segmentsP.append(P[indexes[i]:indexes[i+1]])
+        return segmentsT, segmentsX, segmentsY, segmentsP
+
 
 class DataProcessor(object):
 
