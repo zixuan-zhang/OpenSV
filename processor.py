@@ -114,6 +114,8 @@ class PreProcessor(object):
         segmentsY = []
         segmentsP = []
         for i in range(len(indexes)-1):
+            if (indexes[i+1] - indexes[i]) == 1:
+                continue
             segmentsT.append(T[indexes[i]:indexes[i+1]])
             segmentsX.append(X[indexes[i]:indexes[i+1]])
             segmentsY.append(Y[indexes[i]:indexes[i+1]])
@@ -539,8 +541,10 @@ class SVMProcessor(DataProcessor):
         ListR = []
         for i in range(len(ListX)):
             R = []
-            for j in range(len(ListX[i] - 1)):
-                R.append(numpy.sqrt(pow(ListX[i][j+1]-ListX[i][j]) + pow(ListY[i][j+1]-ListY[i][j])))
+            for j in range(len(ListX[i]) - 1):
+                R.append(numpy.sqrt(pow(ListX[i][j+1]-ListX[i][j], 2) + 
+                    pow(ListY[i][j+1]-ListY[i][j], 2)))
+            R.append(R[-1])
             ListR.append(R)
         return ListR
 
@@ -569,8 +573,8 @@ class SVMProcessor(DataProcessor):
         # TODO: equation error
         #ListVR = self._velocity_of_list(ListR, ListT)
         ListVR = []
-        for i in range(ListR):
-            R = [ListR[i][j] / (ListT[i][j+1]-ListT[i][j]) for j in range(ListR[i] - 1)]
+        for i in range(len(ListR)):
+            R = [ListR[i][j] / (ListT[i][j+1]-ListT[i][j]) for j in range(len(ListR[i]) - 1)]
             R.append(R[-1])
             ListVR.append(R)
         return ListVR

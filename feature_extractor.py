@@ -97,14 +97,14 @@ class SVMFeature(object):
         self.features.append(feature)
         
     def __str__(self):
-        return ' '.join(self.features)
+        return ' '.join([str(f) for f in self.features])
 
 class SVMFeatureExtractor(FeatureExtractor):
     
 
-    def __init__(self, ListVX, ListVY, ListVR):
+    def __init__(self):
 
-        self.svmFeature = SVMFeature()
+        self.svmFeature = []
 
     def _points_lt_zero(self, ListA):
         cnt = 0
@@ -169,8 +169,8 @@ class SVMFeatureExtractor(FeatureExtractor):
         self.stdVX = self._std(ListVX)
         self.stdVY = self._std(ListVY)
 
-        ListAbsVX = SVMProcessor.abs_velocity_of_x(SVMProcessor, ListVX)
-        ListAbsVY = SVMProcessor.abs_velocity_of_y(SVMProcessor, ListVY)
+        ListAbsVX = SVMProcessor.abs_velocity_of_x(SVMProcessor(), ListVX)
+        ListAbsVY = SVMProcessor.abs_velocity_of_y(SVMProcessor(), ListVY)
         self.avgAbsVX = self._avg(ListAbsVX)
         self.avgAbsVY = self._avg(ListAbsVY)
 
@@ -387,7 +387,7 @@ class SVMFeatureExtractor(FeatureExtractor):
         
         for AX in ListAX:
             for i in range(len(AX) - 1):
-                if AX[i]*VX[i+1] < 0 or AX[i] == 0:
+                if AX[i]*AX[i+1] < 0 or AX[i] == 0:
                     pointsCntZeroAX += 1
         for AY in ListAY:
             for i in range(len(AY) - 1):
@@ -421,10 +421,10 @@ class SVMFeatureExtractor(FeatureExtractor):
         stdAY = self._std(ListAY)
         avgPosAX = numpy.mean(self._select_positive(ListAX))
         avgPosAY = numpy.mean(self._select_positive(ListAY))
-        avgNegAX = numpy.nean(self._select_negative(ListAX))
+        avgNegAX = numpy.mean(self._select_negative(ListAX))
         avgNegAY = numpy.mean(self._select_negative(ListAY))
-        ListAbsAX = SVMProcessor.abs_acc_of_x(SVMProcessor, ListAX)
-        ListAbsAY = SVMProcessor.abs_acc_of_y(SVMProcessor, ListAY)
+        ListAbsAX = SVMProcessor.abs_acc_of_x(SVMProcessor(), ListAX)
+        ListAbsAY = SVMProcessor.abs_acc_of_y(SVMProcessor(), ListAY)
         avgAbsAX = self._avg(ListAbsAX)
         avgAbsAY = self._avg(ListAbsAY)
         maxAbsAX = self._max(ListAbsAX)
@@ -503,5 +503,8 @@ class SVMFeatureExtractor(FeatureExtractor):
         self.features_of_acceleration(ListAR, ListAX, ListAY)
         self.features_of_curve(ListX, ListY)
     
-    def display_features(self):
-        print self.svmFeature
+    def features(self):
+        return self.svmFeature
+
+    def clear(self):
+        self.svmFeature = []
