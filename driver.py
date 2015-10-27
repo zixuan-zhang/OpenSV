@@ -2,6 +2,7 @@
 #coding=utf-8
 
 import sys, os
+import numpy
 
 import matplotlib.pyplot as plt
 import matplotlib.pyplot as plt1
@@ -10,28 +11,10 @@ from sklearn import tree
 
 import settings
 from processor import PreProcessor, SVMProcessor
-from feature_extractor import SVMFeatureExtractor
+from feature_extractor import SVMFeatureExtractor, ProbFeatureExtractor
 
-def get_data(fileDir):
-    #dataDir = '/'.join([os.getcwd(), settings.TRAINING_DATA_DIR, fileName])
-    with open(dataDir) as fp:
-        lines = fp.readlines()
-        X = []
-        Y = []
-        T = []
-        P = []
-        for line in lines[1:]:
-            items = line.split()
-            X.append(float(items[0]))
-            Y.append(float(items[1]))
-            T.append(int(items[2]))
-            P.append(float(items[6]))
-    return X, Y, T, P
 
 class Driver(object):
-
-    def __init__(self):
-        pass
 
     def get_data_from_file(self, filePath):
         #dataDir = '/'.join([os.getcwd(), settings.TRAINING_DATA_DIR, fileName])
@@ -49,13 +32,6 @@ class Driver(object):
                 P.append(float(items[6]))
         return X, Y, T, P
 
-class SVMDriver(Driver):
-
-    def __init__(self):
-        self.preProcessor = PreProcessor()
-        self.svmProcessor = SVMProcessor()
-        self.svmFeatureExtractor = SVMFeatureExtractor()
-
     def pre_process(self, fileName):
         """
             pre-preocoess
@@ -69,6 +45,20 @@ class SVMDriver(Driver):
         ListT, ListX, ListY, ListP = self.preProcessor.signature_segmentation(T, X, Y, P)
 
         return ListT, ListX, ListY, ListP
+
+    def data_process(self, fileName):
+        pass
+
+    def generate_features(self, fileName):
+        pass
+
+class SVMDriver(Driver):
+
+    def __init__(self):
+        self.preProcessor = PreProcessor()
+        self.svmProcessor = SVMProcessor()
+        self.svmFeatureExtractor = SVMFeatureExtractor()
+
 
     def data_process(self, fileName):
         ListT, ListX, ListY, ListP = self.pre_process(fileName)
@@ -93,6 +83,53 @@ class SVMDriver(Driver):
 
     def feature_clear(self):
         self.svmFeatureExtractor.clear()
+
+class ProbDriver(Driver):
+
+    def __init__(self):
+        self.svmProcessor = SVMProcessor()
+        self.probFeatureExtractor = ProbFeatureExtractor()
+        self.preProcessor = PreProcessor()
+
+    def data_process(self, filePath):
+        ListT, ListX, ListY, ListP = self.pre_process(filePath)
+        ListR = self.svmProcessor.radius(ListX, ListY)
+        ListVX = self.svmProcessor.velocity_of_x(ListX, ListT)
+        ListVY = self.svmProcessor.velocity_of_y(ListY, ListT)
+        ListAX = self.svmProcessor.acc_of_vx(ListVX, ListT)
+        ListAY = self.svmProcessor.acc_of_vy(ListVY, ListT)
+
+        return ListT, ListR, ListVX, ListVY, ListAX, ListAY
+
+    def generate_features(self, filePath):
+        ListT, ListR, ListVX, ListVY, ListAX, ListAY = self.data_process(filePath)
+        self.probFeatureExtractor.generate_features(ListT, ListR, ListVX, ListVY, ListAX, ListAY)
+        return self.probFeatureExtractor.features()
+
+    def feature_clear(self):
+        self.probFeatureExtractor.clear()
+
+    def PS(self, F):
+        P = []
+        for i in range(len(F)):
+            p = numpy.exp(-1 * pow((F[i] - self.meanF[i]), 2) / 2 / self.varF[i]) / numpy.sqrt(2 * self.meanF[i] * self.varF[i])
+            P.append(p)
+        print [round(p, 11) for p in P]
+        return sum(P)
+
+    def ps_temp(self, ListF):
+        self.meanF = []
+        self.varF = []
+
+        Features = []
+        for F in ListF:
+            for i in range(len(F)):
+                if i >= len(Features):
+                    Features.append([])
+                Features[i].append(F[i])
+        for F in Features:
+            self.meanF.append(numpy.mean(F))
+            self.varF.append(numpy.var(F))
 
 def get_training_data(svmDriver):
     print "loading training data"
@@ -128,12 +165,23 @@ def get_test_data(svmDriver):
     return X
 
 if __name__ == "__main__":
-    svmDriver = SVMDriver()
+    svmDriver = ProbDriver()
     XTraining, YTraining = get_training_data(svmDriver)
     XTest = get_test_data(svmDriver)
-    #clf = svm.SVC()
-    clf = tree.DecisionTreeClassifier()
+    svmDriver.ps_temp(XTraining)
+    for X in XTraining:
+        ps = svmDriver.PS(X)
+        print ps
+    print
+    for X in XTest:
+        ps = svmDriver.PS(X)
+        print ps
+    
+    """
+    clf = svm.SVC()
+    #clf = tree.DecisionTreeClassifier()
     clf.fit(XTraining, YTraining)
     result = clf.predict(XTest)
     print YTraining
     print result
+    """

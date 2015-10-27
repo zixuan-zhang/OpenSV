@@ -678,6 +678,28 @@ class SVMProcessor(DataProcessor):
             ListAV.append(AV)
         return ListAV
 
+class VagueProcessor(object):
+
+    def __init__(self):
+        pass
+
+    def vague_processor(self, X, Y):
+        """
+            需要子类实现vague方法
+        """
+
+    def do_vague(self, X, Y):
+        RX, RY = self.vague_processor(X, Y)
+        return RX, RY
+
+class RandomVagueProcessor(VagueProcessor):
+
+    def __init__(self, rate = 0.3):
+        self.rate = rate
+
+    def vague_processor(X, Y):
+        
+
 if __name__ == "__main__":
     processor = PreProcessor()
     X = [[1, 1.2, 1.3, 1.1]]

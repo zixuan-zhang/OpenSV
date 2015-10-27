@@ -35,6 +35,9 @@ class FeatureExtractor(object):
     def __init__(self):
         pass
 
+    def _global_feature(self, ListT, ListX, ListY, ListP):
+        self.totalTime = ListT[-1][-1] - ListT[0][0]
+
     def _avg(self, ListV):
         """
             inner function
@@ -88,6 +91,14 @@ class FeatureExtractor(object):
                 if a < 0:
                     negA.append(a)
         return negA
+
+    def _cnt_of_zero(self, ListA):
+        cntOfZero = 0
+        for A in ListA:
+            for i in range(len(A)-1):
+                if A[i] == 0 or A[i]*[i+1] < 0:
+                    cntOfZero += 1
+        return cntOfZero
 
 class SVMFeature(object):
     def __init__(self):
@@ -508,3 +519,32 @@ class SVMFeatureExtractor(FeatureExtractor):
 
     def clear(self):
         self.svmFeature = []
+
+class ProbFeatureExtractor(FeatureExtractor):
+
+    def __init__(self):
+        self.probFeature = []
+
+    def generate_features(self, ListT, ListR, ListVX, ListVY, ListAX, ListAY):
+        self.totalTime = ListT[-1][-1] - ListT[0][0] # 1
+        self.cntOfZeroVX = self._cnt_of_zero(ListVX) # 2
+        self.cntOfZeroVY = self._cnt_of_zero(ListVY) # 3
+        self.cntOfZeroAX = self._cnt_of_zero(ListAX) # 4
+        self.cntOfZeroAY = self._cnt_of_zero(ListAY) # 5
+        self.totalDistance = 0 # 6
+        for R in ListR:
+            for r in R:
+                self.totalDistance += r
+
+        self.probFeature.append(self.totalTime) # 1
+        self.probFeature.append(self.cntOfZeroVX) # 2
+        self.probFeature.append(self.cntOfZeroVY) # 3
+        self.probFeature.append(self.cntOfZeroAX) # 4
+        self.probFeature.append(self.cntOfZeroAY) # 5
+        self.probFeature.append(self.totalDistance) # 6
+
+    def features(self):
+        return self.probFeature
+
+    def clear(self):
+        self.probFeature = []
