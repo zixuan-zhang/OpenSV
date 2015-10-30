@@ -5,7 +5,6 @@ import sys, os
 import numpy
 
 import matplotlib.pyplot as plt
-import matplotlib.pyplot as plt1
 from sklearn import svm
 from sklearn import tree
 
@@ -13,6 +12,21 @@ import settings
 from processor import PreProcessor, SVMProcessor
 from feature_extractor import SVMFeatureExtractor, ProbFeatureExtractor
 
+def get_data_from_file(self, filePath):
+    #dataDir = '/'.join([os.getcwd(), settings.TRAINING_DATA_DIR, fileName])
+    with open(filePath) as fp:
+        lines = fp.readlines()
+        X = []
+        Y = []
+        T = []
+        P = []
+        for line in lines[1:]:
+            items = line.split()
+            X.append(float(items[0]))
+            Y.append(float(items[1]))
+            T.append(int(items[2]))
+            P.append(float(items[6]))
+    return X, Y, T, P
 
 class Driver(object):
 

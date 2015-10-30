@@ -692,13 +692,20 @@ class VagueProcessor(object):
         RX, RY = self.vague_processor(X, Y)
         return RX, RY
 
-class RandomVagueProcessor(VagueProcessor):
+class RawVagueProcessor(VagueProcessor):
 
     def __init__(self, rate = 0.3):
         self.rate = rate
 
+    @param_length_matcher
     def vague_processor(X, Y):
-        
+        resultX = []
+        resultY = []
+        for i in range(len(X)):
+            if (i % 10 not in [range(10*rate)]):
+                resultX.append(X[i])
+                resultY.append(Y[i])
+        return resultX, resultY
 
 if __name__ == "__main__":
     processor = PreProcessor()
