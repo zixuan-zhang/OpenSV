@@ -6,7 +6,9 @@ from scipy.fftpack import dct
 
 from settings import DCT_DIMENTION_NUM
 from decorators import param_length_matcher
-from processor import SVMProcessor
+from processor import SVMProcessor, PreProcessor
+
+from auto_encoder import get_features_using_autoencoder
 
 class DCTFeatureExtractor(object):
     def __init__(self):
@@ -548,3 +550,33 @@ class ProbFeatureExtractor(FeatureExtractor):
 
     def clear(self):
         self.probFeature = []
+
+class AutoEncoderFeatureExtractor(FeatureExtractor):
+
+    def __init__(self, width, height):
+        self.features = []
+        self.width = width
+        self.height = height
+
+
+    def imagize(self, X, Y):
+        """
+        generate imagize data from coordinates
+        """
+
+        processor = PreProcessor()
+        X, Y = processor.size_normalization(X, Y, self.width, self.height)
+        X = [round(x) for x in X]
+        Y = [round(y) for y in Y]
+
+        image = numpy.zeros((self.height, self.width))
+        for (x,y) in zip(X, Y):
+            image[y][x] = 100
+        return image
+
+    def generate_features(self, X, Y, layer_sizes):
+        """
+
+        """
+        image = self.imagize(X, Y)
+        self.features = get_features_using_autoencoder(image, layer_sizes)

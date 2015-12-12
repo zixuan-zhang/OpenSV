@@ -42,7 +42,7 @@ class PreProcessor(object):
         resultY = [y - meanY for y in Y]
         return resultX, resultY
 
-    def size_normalization(self, X, Y):
+    def size_normalization(self, X, Y, width, height):
         """
             轨迹大小归一化
             将轨迹缩放到400 * 100的空间内
@@ -56,8 +56,10 @@ class PreProcessor(object):
         rangeX = maxX - minX
         rangeY = maxY - minY
 
-        mX = 400
-        mY = 100
+        # mX = 400
+        # mY = 100
+        mX = width
+        mY = height
 
         resultX = [mX * (x - minX) / rangeX for x in X]
         resultY = [mY * (y - minY) / rangeY for y in Y]
