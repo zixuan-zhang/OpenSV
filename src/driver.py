@@ -10,8 +10,8 @@ from sklearn import tree
 
 import settings
 from processor import PreProcessor, SVMProcessor
-from feature_extractor import SVMFeatureExtractor, ProbFeatureExtractor
-
+from feature_extractor import SVMFeatureExtractor, ProbFeatureExtractor,\
+        AutoEncoderFeatureExtractor
 
 class Driver(object):
 
@@ -129,6 +129,38 @@ class ProbDriver(Driver):
         for F in Features:
             self.meanF.append(numpy.mean(F))
             self.varF.append(numpy.var(F))
+
+def AutoEncoderDriver(driver):
+
+    def __init__(self):
+        # data structure
+        self.data = None
+        width = 30
+        height = 30
+        self.featureExtractor = AutoEncoderFeatureExtractor(width, height)
+
+    def load_data(self):
+        dataDir = "../data/Task1"
+        os.chdir(dataDir)
+        curDir = os.getcwd()
+        self.data = []
+        for uid in range(settings.USER_COUNT):
+            uidData = []
+            for sid in range(1, 21):
+                fileName = "u%ds%d.txt" % (uid, sid)
+                X, Y, T, P = self.get_data_from_file(fileName)
+                uidData.append((X, Y))
+            self.data.append(uidData)
+
+    def imagize(self):
+        data = []
+        for uid in range(40):
+            uidData = []
+            for sid in range(40):
+                image = self.featureExtractor.imagize(self.data[uid][sid])
+                uidData.append(image)
+            data.append(uidData)
+        self.data = data
 
 def get_training_data(svmDriver):
     print "loading training data"

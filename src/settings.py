@@ -7,3 +7,6 @@ OUTPUT_DIR = 'output'
 
 # Feature Settings
 DCT_DIMENTION_NUM = 20
+
+# data settings
+USER_COUNT = 40
