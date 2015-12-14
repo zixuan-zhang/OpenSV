@@ -558,25 +558,23 @@ class AutoEncoderFeatureExtractor(FeatureExtractor):
         self.width = width
         self.height = height
 
-
     def imagize(self, X, Y):
         """
         generate imagize data from coordinates
         """
 
-        processor = PreProcessor()
-        X, Y = processor.size_normalization(X, Y, self.width, self.height)
-        X = [round(x) for x in X]
-        Y = [round(y) for y in Y]
+        X = [int(round(x)) for x in X]
+        Y = [int(round(y)) for y in Y]
 
-        image = numpy.zeros((self.height, self.width))
+        image = numpy.zeros((self.height+1, self.width+1))
         for (x,y) in zip(X, Y):
-            image[y][x] = 100
+            image[self.height-y][x] = 100
+        image = image.reshape((self.height+1)*(self.width+1))
         return image
 
-    def generate_features(self, X, Y, layer_sizes):
+    def generate_features(self, image, layer_sizes):
         """
 
         """
-        image = self.imagize(X, Y)
-        self.features = get_features_using_autoencoder(image, layer_sizes)
+        features = get_features_using_autoencoder(image, layer_sizes)
+        return features

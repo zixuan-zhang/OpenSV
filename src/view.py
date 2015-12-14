@@ -12,12 +12,12 @@ import os
 import matplotlib.pyplot as plt
 
 import settings
-from driver import get_data_from_file, AutoEncoderDriver
+from driver import AutoEncoderDriver
 
 def _input_uid():
     while True:
         print "please input uid. 0-40"
-        print ">>>"
+        print ">>>",
         input = raw_input()
         try:
             uid = int(input)
@@ -30,7 +30,7 @@ def _input_uid():
 def _input_sid():
     while True:
         print "please input sid. 0-40"
-        print ">>>"
+        print ">>>",
         input = raw_input()
         try:
             sid = int(input)
@@ -40,32 +40,53 @@ def _input_sid():
             print "input illegal, please retype"
             continue
 
-def autoencoder_view():
+def autoencoder_view_features():
     driver = AutoEncoderDriver()
     driver.load_data()
+    driver.size_normalization()
+    driver.imagize()
+    driver.generate_features()
+    driver.dump_feature()
+    while True:
+        uid = _input_uid()
+        sid = _input_sid()
+        print driver.features[uid][sid]
+
+def autoencoder_view_origin():
+    driver = AutoEncoderDriver()
+    driver.load_data()
+    driver.size_normalization()
+    while True:
+        uid = _input_uid()
+        sid = _input_sid()
+        plt.plot(driver.data[uid][sid][0],
+                driver.data[uid][sid][1])
+        plt.show()
+
+def autoencoder_view():
+    # use the following 4 steps, you can use iamge data
+    driver = AutoEncoderDriver()
+    driver.load_data()
+    driver.size_normalization()
     driver.imagize()
 
     while True:
         uid = _input_uid() 
         sid = _input_sid()
         image = driver.data[uid][sid]
-        X = []
-        Y = []
-        for x in len(image):
-            row = image[x]
-            for y in len(row):
-                if image[x][y] != 0:
-                    X.append(x)
-                    Y.append(y)
-        plt.plot(X, Y)
-        plt.show()
+        width, height = image.shape
+        for i in range(width):
+            for j in range(height):
+                if image[i][j] != 0:
+                    print ".",
+                else:
+                    print " ",
+            print 
+        print 
 
 def draw_plot(X, Y):
     plt.plot(X, Y)
     plt.show()
 
 if __name__ == "__main__":
-    fileName = "USER1_1.txt"
-    filePath = '/'.join([os.getcwd(), settings.TRAINING_DATA_DIR, fileName])
-    X, Y, T, P = get_data_from_file(filePath)
-    draw_plot(X, Y)
+    autoencoder_view_features()

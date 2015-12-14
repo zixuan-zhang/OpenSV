@@ -157,8 +157,6 @@ class StackedAutoEncoder(object):
             endTime = time.time()
             print ">>>layer:%d, time cost:%f" % (i, (endTime - startTime))
             self.hiddens.append(hidden_value)
-            print ">>>hidden_values are: "
-            print hidden_value
 
 def get_features_using_autoencoder(set_x, layer_sizes):
     N = len(set_x)

@@ -3,6 +3,7 @@
 
 import sys, os
 import numpy
+import json
 
 import matplotlib.pyplot as plt
 from sklearn import svm
@@ -130,37 +131,84 @@ class ProbDriver(Driver):
             self.meanF.append(numpy.mean(F))
             self.varF.append(numpy.var(F))
 
-def AutoEncoderDriver(driver):
+class AutoEncoderDriver(Driver):
 
     def __init__(self):
         # data structure
         self.data = None
-        width = 30
-        height = 30
-        self.featureExtractor = AutoEncoderFeatureExtractor(width, height)
+        self.features = None
+        self.width = 30
+        self.height = 30
+        self.featureExtractor = AutoEncoderFeatureExtractor(self.width, self.height)
+        self.processor = PreProcessor()
 
     def load_data(self):
-        dataDir = "../data/Task1"
+        dataDir = "../data/Task2"
         os.chdir(dataDir)
         curDir = os.getcwd()
         self.data = []
-        for uid in range(settings.USER_COUNT):
+        for uid in range(1, settings.USER_COUNT+1):
             uidData = []
-            for sid in range(1, 21):
-                fileName = "u%ds%d.txt" % (uid, sid)
+            for sid in range(1, 41):
+                fileName = "U%dS%d.TXT" % (uid, sid)
                 X, Y, T, P = self.get_data_from_file(fileName)
                 uidData.append((X, Y))
             self.data.append(uidData)
+        os.chdir("../..")
+
+    def size_normalization(self):
+        data = []
+        for uid in range(40):
+            uidData = []
+            for sid in range(40):
+                X, Y = self.processor.size_normalization(
+                        self.data[uid][sid][0],
+                        self.data[uid][sid][1],
+                        self.width, self.height)
+                uidData.append((X, Y))
+            data.append(uidData)
+        self.data = data
 
     def imagize(self):
         data = []
         for uid in range(40):
             uidData = []
             for sid in range(40):
-                image = self.featureExtractor.imagize(self.data[uid][sid])
+                image = self.featureExtractor.imagize(self.data[uid][sid][0],
+                        self.data[uid][sid][1])
                 uidData.append(image)
             data.append(uidData)
         self.data = data
+
+    def generate_features(self):
+        """
+        generate feature from image to features using stacked autoencoder 
+        """
+        self.features = []
+        for uid in range(5):
+            uidFeatures = []
+            for sid in range(5):
+                layer_sizes = [500, 300, 100, 50, 20]
+                feature = self.featureExtractor.generate_features(
+                        self.data[uid][sid], layer_sizes)
+                feature = feature[0]
+                uidFeatures.append(feature)
+                print ">>>uid: %d, sid: %d ends" % (uid, sid)
+                print ">>>features are", feature
+            self.features.append(uidFeatures)
+
+    def dump_feature(self):
+        dataDir = "./data"
+        os.chdir(dataDir)
+        autoFeatureDir = "auto_features"
+        if not os.path.exists(autoFeatureDir):
+            os.mkdir(autoFeatureDir)
+        os.chdir(autoFeatureDir)
+        for uid in range(5):
+            for sid in range(5):
+                fileName = "u%ds%d.txt" % (uid, sid)
+                numpy.savetxt(fileName, self.features[uid][sid],fmt="%10.5f")
+        os.chdir("../..")
 
 def get_training_data(svmDriver):
     print "loading training data"
