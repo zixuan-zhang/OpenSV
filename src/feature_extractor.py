@@ -568,7 +568,7 @@ class AutoEncoderFeatureExtractor(FeatureExtractor):
 
         image = numpy.zeros((self.height+1, self.width+1))
         for (x,y) in zip(X, Y):
-            image[self.height-y][x] = 100
+            image[self.height-y][x] = 1
         image = image.reshape((self.height+1)*(self.width+1))
         return image
 

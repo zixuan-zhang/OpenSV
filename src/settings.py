@@ -10,3 +10,6 @@ DCT_DIMENTION_NUM = 20
 
 # data settings
 USER_COUNT = 40
+
+# AutoEncoder settings
+MAX_EPOCH = 1000

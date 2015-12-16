@@ -114,8 +114,13 @@ class ProbDriver(Driver):
         for i in range(len(F)):
             p = numpy.exp(-1 * pow((F[i] - self.meanF[i]), 2) / 2 / self.varF[i]) / numpy.sqrt(2 * self.meanF[i] * self.varF[i])
             P.append(p)
-        print [round(p, 11) for p in P]
-        return sum(P)
+        # print [round(p, 11) for p in P]
+        # print numpy.isnan(P)
+
+        PArray = numpy.asarray(P)
+        PArray[numpy.isnan(PArray)] = 0
+
+        return PArray.sum()
 
     def ps_temp(self, ListF):
         self.meanF = []
@@ -135,8 +140,8 @@ class AutoEncoderDriver(Driver):
 
     def __init__(self):
         # data structure
-        self.data = None
-        self.features = None
+        self.data = []
+        self.features = []
         self.width = 30
         self.height = 30
         self.featureExtractor = AutoEncoderFeatureExtractor(self.width, self.height)
@@ -185,10 +190,10 @@ class AutoEncoderDriver(Driver):
         generate feature from image to features using stacked autoencoder 
         """
         self.features = []
-        for uid in range(5):
+        for uid in range(40):
             uidFeatures = []
-            for sid in range(5):
-                layer_sizes = [500, 300, 100, 50, 20]
+            for sid in range(40):
+                layer_sizes = [500, 300, 100]
                 feature = self.featureExtractor.generate_features(
                         self.data[uid][sid], layer_sizes)
                 feature = feature[0]
@@ -204,11 +209,75 @@ class AutoEncoderDriver(Driver):
         if not os.path.exists(autoFeatureDir):
             os.mkdir(autoFeatureDir)
         os.chdir(autoFeatureDir)
-        for uid in range(5):
-            for sid in range(5):
+        for uid in range(40):
+            for sid in range(40):
                 fileName = "u%ds%d.txt" % (uid, sid)
                 numpy.savetxt(fileName, self.features[uid][sid],fmt="%10.5f")
         os.chdir("../..")
+
+    def load_feature(self, fileDir = None):
+        if not fileDir:
+            fileDir = "../data/auto_features_40"
+        os.chdir(fileDir)
+        for uid in range(40):
+            uidFeatures = []
+            for sid in range(40):
+                fileName = "u%ds%d.txt" % (uid, sid)
+                feature = numpy.loadtxt(fileName)
+                uidFeatures.append(feature)
+            self.features.append(uidFeatures)
+
+    def train_test_set(self, uid, cnt):
+        uidFeatures = self.features[uid]
+        train_set_x = []
+        pos_set_x = []
+        neg_set_x = []
+        test_set_x = []
+        for sid in range(cnt):
+            train_set_x.append(uidFeatures[sid].tolist())
+        for sid in range(cnt, 20):
+            pos_set_x.append(uidFeatures[sid].tolist())
+        for i in range(40):
+            if i == uid:
+                continue
+            for sid in range(40):
+                neg_set_x.append(self.features[i][sid].tolist())
+
+        return train_set_x, pos_set_x, neg_set_x
+
+    def score(self):
+
+        self.load_feature()
+        train_set_x, pos_set_x, neg_set_x = self.train_test_set(1, 5)
+
+        driver = ProbDriver()
+        print ">>> training..."
+        driver.ps_temp(train_set_x)
+
+        print ">>> train set"
+        trainPS = []
+        for X in train_set_x:
+            ps = driver.PS(X)
+            trainPS.append(ps)
+        threshold = min(trainPS)
+        print ">>> train set min is ", threshold
+
+        # testing process
+        print ">>> postive test set"
+        posPS = []
+        for X in pos_set_x:
+            ps = driver.PS(X)
+            posPS.append(ps)
+        print ">>> total postive set %d, greater than threshold %d" % (len(posPS),
+                len([ps for ps in posPS if ps >= threshold]))
+
+        print ">>> negtive test set"
+        negPS = []
+        for X in neg_set_x:
+            ps = driver.PS(X)
+            negPS.append(ps)
+        print ">>> total negtive set %d, less than threshold %d" % (len(negPS),
+                len([ps for ps in negPS if ps < threshold]))
 
 def get_training_data(svmDriver):
     print "loading training data"
@@ -244,6 +313,11 @@ def get_test_data(svmDriver):
     return X
 
 if __name__ == "__main__":
+
+    autoDriver = AutoEncoderDriver()
+    autoDriver.score()
+
+    """
     svmDriver = ProbDriver()
     XTraining, YTraining = get_training_data(svmDriver)
     XTest = get_test_data(svmDriver)
@@ -255,6 +329,7 @@ if __name__ == "__main__":
     for X in XTest:
         ps = svmDriver.PS(X)
         print ps
+    """
     
     """
     clf = svm.SVC()

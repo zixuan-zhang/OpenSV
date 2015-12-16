@@ -8,6 +8,8 @@ import theano
 import theano.tensor as T
 from theano.tensor.shared_randomstreams import RandomStreams # theano中随机数生成器
 
+import settings
+
 """
 其中参数input, W, bhid, bvis都是张量类型：theano.tensor.TensorType
 设定随机数: numpy.random.RandomState; theano.tensor.shared_randomstreams.RandomStreams
@@ -151,11 +153,14 @@ class StackedAutoEncoder(object):
             train_autoencoder = theano.function(inputs=[x],
                     outputs=[cost, hidden, construction], updates=updates)
 
-            for epoch in range(1000):
+            for epoch in range(settings.MAX_EPOCH):
                 cost_value, hidden_value, construction_value = train_autoencoder(layer_input)
 
             endTime = time.time()
             print ">>>layer:%d, time cost:%f" % (i, (endTime - startTime))
+            # print ">>>W is ", autoencoder.W.get_value()
+            # print ">>>hidden is ", hidden_value
+            # print ">>>output is ", autoencoder.get_reconstructed_input(hidden_value).eval()
             self.hiddens.append(hidden_value)
 
 def get_features_using_autoencoder(set_x, layer_sizes):
@@ -168,11 +173,13 @@ def get_features_using_autoencoder(set_x, layer_sizes):
     return features
 
 def test_stacked_autoencoder():
-    N = 100
+    N = 5
     #set_x = numpy.random.randn(1, 100)
-    set_x = [205 if i%3== 0 or i%7==0 else 0 for i in range(100)]
+    set_x = [1 if i%3== 0 or i%7==0 else 0 for i in range(N)]
     set_x = [set_x]
-    sda = StackedAutoEncoder(set_x, n_layer_sizes=[100, 50, 20, 10])
+    print ">>> set_x", set_x
+    sda = StackedAutoEncoder(set_x, n_layer_sizes=[N, 2, 1])
 
 if __name__ == "__main__":
-    test_autoencoder()
+    # test_autoencoder()
+    test_stacked_autoencoder()
