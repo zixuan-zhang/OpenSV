@@ -279,6 +279,48 @@ class AutoEncoderDriver(Driver):
         print ">>> total negtive set %d, less than threshold %d" % (len(negPS),
                 len([ps for ps in negPS if ps < threshold]))
 
+class JaccardDriver(Driver):
+    """
+    A similarity method
+    """
+
+    def __init__(self, train_set, threshold=0.7):
+        if not train_set:
+            return
+        self.train_set = train_set
+        self.threshold = threshold
+        self.featureSize = len(train_set[0])
+        self.trainCount = len(train_set)
+
+        self.genuineFeature = [0] * self.featureSize
+
+        for X in train_set:
+            for i in range(self.featureSize):
+                x = round(X[i])
+                self.genuineFeature[i] += x
+
+        for i in self.genuineFeature:
+            self.genuineFeature[i] = round(float(self.genuineFeature[i]) / self.trainCount)
+
+    def similarity(self, test_set, threshold=None):
+        """
+        求test_set与train过的genuineFeature的相似性
+        """
+        if not threshold:
+            threshold = self.threshold
+        assert len(test_set) == self.featureSize
+
+        newTestSet = [round(x) for x in test_set]
+        res = sum([1 if test_set[i] == self.genuineFeature[i] else 0 for i in range(self.featureSize)])
+        return float(res) / self.featureSize 
+
+def test_jaccard_driver():
+    """
+    使用Stacked AutoEncoder提取出来的特征，使用JaccardDriver的
+    方法看下效果
+    """
+    autoDriver = AutoEncoderDriver()
+
 def get_training_data(svmDriver):
     print "loading training data"
     training_dir = '/'.join([os.getcwd(), settings.TRAINING_DATA_DIR])
