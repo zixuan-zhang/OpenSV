@@ -217,7 +217,7 @@ class AutoEncoderDriver(Driver):
 
     def load_feature(self, fileDir = None):
         if not fileDir:
-            fileDir = "../data/auto_features_40"
+            fileDir = "../data/auto_features"
         os.chdir(fileDir)
         for uid in range(40):
             uidFeatures = []
@@ -299,8 +299,9 @@ class JaccardDriver(Driver):
                 x = round(X[i])
                 self.genuineFeature[i] += x
 
-        for i in self.genuineFeature:
-            self.genuineFeature[i] = round(float(self.genuineFeature[i]) / self.trainCount)
+        for i in range(self.featureSize):
+            self.genuineFeature[i] = round(float(self.genuineFeature[i]) /
+                self.trainCount)
 
     def similarity(self, test_set, threshold=None):
         """
@@ -311,15 +312,8 @@ class JaccardDriver(Driver):
         assert len(test_set) == self.featureSize
 
         newTestSet = [round(x) for x in test_set]
-        res = sum([1 if test_set[i] == self.genuineFeature[i] else 0 for i in range(self.featureSize)])
+        res = sum([1 if newTestSet[i] == self.genuineFeature[i] else 0 for i in range(self.featureSize)])
         return float(res) / self.featureSize 
-
-def test_jaccard_driver():
-    """
-    使用Stacked AutoEncoder提取出来的特征，使用JaccardDriver的
-    方法看下效果
-    """
-    autoDriver = AutoEncoderDriver()
 
 def get_training_data(svmDriver):
     print "loading training data"
@@ -354,10 +348,57 @@ def get_test_data(svmDriver):
         X.append(f)
     return X
 
-if __name__ == "__main__":
-
+def test_auto_driver():
+    """
+    """
     autoDriver = AutoEncoderDriver()
     autoDriver.score()
+
+def test_jaccard_driver():
+    """
+    使用Stacked AutoEncoder提取出来的特征，使用JaccardDriver的
+    方法看下效果
+    """
+    autoDriver = AutoEncoderDriver()
+    autoDriver.load_feature()
+
+    train_set = autoDriver.features[0][0:20]
+    test_set_gen = autoDriver.features[0][0:20]
+    test_set_for = autoDriver.features[0][20:40]
+    test_set_oth = autoDriver.features[1][0:20]
+    test_set_oth1 = autoDriver.features[2][0:20]
+
+    # train process
+    jaccardDriver = JaccardDriver(train_set)
+
+    results = []
+    for one_test_set in test_set_gen:
+        res = jaccardDriver.similarity(one_test_set)
+        results.append(res)
+    print numpy.mean(results)
+
+    results = []
+    for one_test_set in test_set_for:
+        res = jaccardDriver.similarity(one_test_set)
+        results.append(res)
+    print numpy.mean(results)
+
+    results = []
+    for one_test_set in test_set_oth:
+        res = jaccardDriver.similarity(one_test_set)
+        results.append(res)
+    print numpy.mean(results)
+
+    results = []
+    for one_test_set in test_set_oth1:
+        res = jaccardDriver.similarity(one_test_set)
+        results.append(res)
+    print numpy.mean(results)
+
+if __name__ == "__main__":
+    test_jaccard_driver()
+
+
 
     """
     svmDriver = ProbDriver()
