@@ -5,7 +5,6 @@ import sys, os
 import numpy
 import json
 
-import matplotlib.pyplot as plt
 from sklearn import svm
 from sklearn import tree
 
@@ -185,24 +184,40 @@ class AutoEncoderDriver(Driver):
             data.append(uidData)
         self.data = data
 
+    def train(self):
+        if not self.data:
+            self.imagize()
+
+        train_set_x = numpy.asarray(self.data)
+        (uCnt, sCnt, pCnt) = train_set_x.shape
+        train_set_x = train_set_x.reshape((uCnt*sCnt, pCnt))
+
+        layer_sizes = [500, 300, 100]
+        n_ins = (self.width + 1) * (self.height + 1)
+        # train data
+        self.featureExtractor.train(train_set_x, n_ins, layer_sizes)
+
     def generate_features(self):
         """
         generate feature from image to features using stacked autoencoder 
         """
+
+        # train data first
+        self.train()
+
         self.features = []
         for uid in range(40):
             uidFeatures = []
             for sid in range(40):
                 layer_sizes = [500, 300, 100]
                 feature = self.featureExtractor.generate_features(
-                        self.data[uid][sid], layer_sizes)
-                feature = feature[0]
+                        self.data[uid][sid])
                 uidFeatures.append(feature)
                 print ">>>uid: %d, sid: %d ends" % (uid, sid)
-                print ">>>features are", feature
             self.features.append(uidFeatures)
 
     def dump_feature(self):
+        print "... dumpint features"
         dataDir = "./data"
         os.chdir(dataDir)
         autoFeatureDir = "auto_features"

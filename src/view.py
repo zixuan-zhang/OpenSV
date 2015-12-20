@@ -9,7 +9,7 @@
 '''
 
 import os
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 
 import settings
 from driver import AutoEncoderDriver

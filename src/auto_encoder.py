@@ -7,6 +7,8 @@ from numpy import *
 import theano
 import theano.tensor as T
 from theano.tensor.shared_randomstreams import RandomStreams # theano中随机数生成器
+from theano.tensor.sharedvar import TensorSharedVariable
+from theano.compile.sharedvalue import shared
 
 import settings
 
@@ -16,6 +18,47 @@ import settings
 如果最初没给权重W，则初始化为[-a, a]之间的均匀分布，numpy.random.RandomState.uniform(low, high, size)
 """
 
+class HiddenLayer(object):
+    def __init__(self, rng, input, n_in, n_out, W=None, b=None,
+                 activation=T.tanh):
+        self.input = input
+        self.activation = activation
+        if W is None:
+            W_values = numpy.asarray(
+                rng.uniform(
+                    low=-numpy.sqrt(6. / (n_in + n_out)),
+                    high=numpy.sqrt(6. / (n_in + n_out)),
+                    size=(n_in, n_out)
+                ),
+                dtype=theano.config.floatX
+            )
+            if activation == theano.tensor.nnet.sigmoid:
+                W_values *= 4
+
+            W = theano.shared(value=W_values, name='W', borrow=True)
+
+        if b is None:
+            b_values = numpy.zeros((n_out,), dtype=theano.config.floatX)
+            b = theano.shared(value=b_values, name='b', borrow=True)
+
+        self.W = W
+        self.b = b
+
+        lin_output = T.dot(input, self.W) + self.b
+        self.output = (
+            lin_output if activation is None
+            else activation(lin_output)
+        )
+        # parameters of the model
+        self.params = [self.W, self.b]
+
+    def get_output(self, input):
+        lin_output = T.dot(input, self.W) + self.b
+        output = (
+                lin_output if self.activation is None
+                else self.activation(lin_output)
+                )
+        return output
 class AutoEncoder(object):
 
     def __init__(self, numpy_rng, input=None, n_visible=100,
@@ -121,12 +164,13 @@ def test_autoencoder():
     # print hidden_value
     # print construction_value
 
-class StackedAutoEncoder(object):
+class NaiveStackedAutoEncoder(object):
     """
-    stacked autoencoder
+    我称之为朴素栈式自编码器。
+    此编码器专门针对单个case，对此case进行栈式自编码。主要目的是降维。
     """
 
-    def __init__(self,set_x, n_layer_sizes, ):
+    def __init__(self,set_x, n_layer_sizes):
 
         self.hiddens = []
         
@@ -164,22 +208,212 @@ class StackedAutoEncoder(object):
             self.hiddens.append(hidden_value)
 
 def get_features_using_autoencoder(set_x, layer_sizes):
+    """
+    deprecated
+    """
     N = len(set_x)
     set_x = [set_x]
     layer_sizes.insert(0, N)
-    sda = StackedAutoEncoder(set_x, layer_sizes)
+    sda = NaiveStackedAutoEncoder(set_x, layer_sizes)
     hiddens = sda.hiddens
     features = hiddens[-1]
     return features
 
+class AdvancedStackedAutoEncoder(object):
+    """
+    我称之为加强版栈式自编码
+    此栈式自编码器接收多个train_set进行训练。然后利用训练后的参数
+    对test_set进行降维
+    """
+
+    def __init__(self, numpy_rng, n_ins=784,
+            hidden_layers_sizes=[500, 500]):
+
+        self.sigmoid_layers = []
+        self.dA_layers = []
+        self.params = []
+        self.n_layers = len(hidden_layers_sizes)
+
+        assert self.n_layers > 0
+
+        # allocate symbolic variables for the data
+        self.x = T.matrix('x')  # the data is presented as rasterized images
+        self.y = T.ivector('y')  # the labels are presented as 1D vector of
+                                 # [int] labels
+        # end-snippet-1
+
+        # start-snippet-2
+        for i in xrange(self.n_layers):
+            # construct the sigmoidal layer
+
+            # the size of the input is either the number of hidden units of
+            # the layer below or the input size if we are on the first layer
+            if i == 0:
+                input_size = n_ins
+            else:
+                input_size = hidden_layers_sizes[i - 1]
+
+            # the input to this layer is either the activation of the hidden
+            # layer below or the input of the SdA if you are on the first
+            # layer
+            if i == 0:
+                layer_input = self.x
+            else:
+                layer_input = self.sigmoid_layers[-1].output
+
+            sigmoid_layer = HiddenLayer(rng=numpy_rng,
+                                        input=layer_input,
+                                        n_in=input_size,
+                                        n_out=hidden_layers_sizes[i],
+                                        activation=T.nnet.sigmoid)
+            # add the layer to our list of layers
+            self.sigmoid_layers.append(sigmoid_layer)
+            self.params.extend(sigmoid_layer.params)
+
+            # Construct a denoising autoencoder that shared weights with this
+            # layer
+            dA_layer = AutoEncoder(numpy_rng=numpy_rng,
+                          input=layer_input,
+                          n_visible=input_size,
+                          n_hidden=hidden_layers_sizes[i],
+                          W=sigmoid_layer.W,
+                          bhid=sigmoid_layer.b)
+            self.dA_layers.append(dA_layer)
+        # end-snippet-2
+
+    def pretraining_functions(self, train_set_x, batch_size):
+        # index to a [mini]batch
+        index = T.lscalar('index')  # index to a minibatch
+        learning_rate = T.scalar('lr')  # learning rate to use
+        # begining of a batch, given `index`
+        batch_begin = index * batch_size
+        # ending of a batch given `index`
+        batch_end = batch_begin + batch_size
+
+        pretrain_fns = []
+        for dA in self.dA_layers:
+            # get the cost and the updates list
+            cost, updates = dA.get_cost_updates(learning_rate)
+            # compile the theano function
+            fn = theano.function(
+                inputs=[
+                    index,
+                    theano.Param(learning_rate, default=0.1)
+                ],
+                outputs=cost,
+                updates=updates,
+                givens={
+                    self.x: train_set_x[batch_begin: batch_end]
+                }
+            )
+            # append `fn` to the list of functions
+            pretrain_fns.append(fn)
+
+        return pretrain_fns
+
+    def get_features(self, test_case):
+        """
+        generate features once training completed
+        """
+        hidden_values = []
+        for i in xrange(self.n_layers):
+            if i == 0:
+                layer_input = test_case
+            else:
+                layer_input = hidden_values[-1]
+
+            hidden_value = self.sigmoid_layers[i].get_output(layer_input)
+            hidden_values.append(hidden_value)
+            
+        # return the final hidden values
+        return hidden_values[-1]
+
+class StackedAutoEncoderDriver(object):
+    """
+    此类实现对外API, 使用时只需要先调用train函数进行训练，
+    然后再调用get_features传入test_set获取最后的features即可
+   """
+
+    def __init__(self):
+        self.sda = None
+
+    def train(self, train_set_x, pretraining_epochs=15,
+            pretrain_lr=0.001, batch_size=1, n_ins=784,
+            hidden_layers_sizes=[500, 500]):
+        """
+        对StackedAutoEncoder进行训练
+        """
+
+        if not isinstance(train_set_x, TensorSharedVariable):
+            train_set_x = shared(train_set_x)
+        n_train_batches = train_set_x.get_value(borrow=True).shape[0]
+        n_train_batches /= batch_size
+
+        print "hidden_layers_sizes: ", hidden_layers_sizes
+
+        print "... building the model"
+        numpy_rng = numpy.random.RandomState(89677)
+        self.sda = AdvancedStackedAutoEncoder(
+            numpy_rng=numpy_rng,
+            n_ins=n_ins,
+            hidden_layers_sizes=hidden_layers_sizes,
+        )
+
+        print "... getting the pretraining function"
+        pretraining_fns = self.sda.pretraining_functions(train_set_x=train_set_x,
+                                                batch_size=batch_size)
+        print '... pre-training the model'
+        for i in xrange(self.sda.n_layers):
+            # go through pretraining epochs
+            for epoch in xrange(pretraining_epochs):
+                # go through the training set
+                c = []
+                for batch_index in xrange(n_train_batches):
+                    c.append(pretraining_fns[i](index=batch_index,lr=pretrain_lr))
+                print 'Pre-training layer %i, epoch %d, cost ' % (i, epoch),
+                print numpy.mean(c)
+
+    def get_features(self, test_case):
+        """
+        特征提取
+        """
+        features = self.sda.get_features(test_case)
+        return features.eval()
+
+
 def test_stacked_autoencoder():
+    """
+    test NaiveStackedAutoEncoder
+    """
     N = 5
     #set_x = numpy.random.randn(1, 100)
     set_x = [1 if i%3== 0 or i%7==0 else 0 for i in range(N)]
     set_x = [set_x]
     print ">>> set_x", set_x
-    sda = StackedAutoEncoder(set_x, n_layer_sizes=[N, 2, 1])
+    sda = NaiveStackedAutoEncoder(set_x, n_layer_sizes=[N, 2, 1])
+
+def test_SdA():
+    """
+    test AdvancedStackedAutoEncoder
+    """
+    # test Sda 就是这么搞
+    # 现在想要得到feature只需要执行两个接口即可
+    # train(), get_features() 非常easy
+    train_sets = [
+            [1., 1., 1.],
+            [2., 2., 2.],
+        ]
+
+    train_set_x = numpy.asarray(train_sets)
+    train_set_x = shared(train_set_x)
+    test_set = [4., 4., 4.]
+    driver = StackedAutoEncoderDriver()
+    driver.train(train_set_x, n_ins=3, hidden_layers_sizes=[2, 1])
+
+    params = driver.sda.params
+    features = driver.get_features(test_set)
 
 if __name__ == "__main__":
     # test_autoencoder()
-    test_stacked_autoencoder()
+    # test_stacked_autoencoder()
+    test_SdA()
