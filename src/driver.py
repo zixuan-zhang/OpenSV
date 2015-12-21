@@ -147,6 +147,8 @@ class AutoEncoderDriver(Driver):
         self.featureExtractor = AutoEncoderFeatureExtractor(self.width, self.height)
         self.processor = PreProcessor()
 
+        self.driver = ProbDriver()
+
     def load_data(self):
         dataDir = "../data/Task2"
         os.chdir(dataDir)
@@ -231,53 +233,77 @@ class AutoEncoderDriver(Driver):
         uidFeatures = self.features[uid]
         train_set_x = []
         pos_set_x = []
-        neg_set_x = []
-        test_set_x = []
+        neg_set_x_ori = []
+        neg_set_x_oth = []
         for sid in range(cnt):
             train_set_x.append(uidFeatures[sid].tolist())
         for sid in range(cnt, 20):
             pos_set_x.append(uidFeatures[sid].tolist())
+        for sid in range(20, 40):
+            neg_set_x_ori.append(uidFeatures[sid].tolist())
         for i in range(40):
             if i == uid:
                 continue
             for sid in range(40):
-                neg_set_x.append(self.features[i][sid].tolist())
+                neg_set_x_oth.append(self.features[i][sid].tolist())
 
-        return train_set_x, pos_set_x, neg_set_x
+        return train_set_x, pos_set_x, neg_set_x_ori, neg_set_x_oth
 
-    def score(self):
+    def score_of_uid(self, uid, cnt):
 
-        self.load_feature()
-        train_set_x, pos_set_x, neg_set_x = self.train_test_set(1, 5)
+        train_set_x, pos_set_x, neg_set_x_ori, neg_set_x_oth = self.train_test_set(uid, cnt)
 
         driver = ProbDriver()
-        print ">>> training..."
+        # print ">>> training..."
         driver.ps_temp(train_set_x)
 
-        print ">>> train set"
+        # print ">>> train set"
         trainPS = []
         for X in train_set_x:
             ps = driver.PS(X)
+            # print ps
             trainPS.append(ps)
         threshold = min(trainPS)
-        print ">>> train set min is ", threshold
+        # print ">>> train set min is ", threshold
+
+        def _score_of_set(set_x, pos=True):
+            size = len(set_x)
+            setPS = []
+            for X in set_x:
+                ps = driver.PS(X)
+                setPS.append(ps)
+            if pos:
+                correctSize = len([ps for ps in setPS if ps >= threshold])
+            else:
+                correctSize = len([ps for ps in setPS if ps <= threshold])
+            return correctSize / float(size)
 
         # testing process
-        print ">>> postive test set"
-        posPS = []
-        for X in pos_set_x:
-            ps = driver.PS(X)
-            posPS.append(ps)
-        print ">>> total postive set %d, greater than threshold %d" % (len(posPS),
-                len([ps for ps in posPS if ps >= threshold]))
+        # print ">>> postive test set"
+        scoreOfPos = _score_of_set(pos_set_x, pos=True)
+        # print ">>> total postive set %d, greater than threshold %f" % (len(pos_set_x), scoreOfPos)
 
-        print ">>> negtive test set"
-        negPS = []
-        for X in neg_set_x:
-            ps = driver.PS(X)
-            negPS.append(ps)
-        print ">>> total negtive set %d, less than threshold %d" % (len(negPS),
-                len([ps for ps in negPS if ps < threshold]))
+        # print ">>> negtive test set"
+        scoreOfNegOri = _score_of_set(neg_set_x_ori, pos=False)
+        # print ">>> original negtive set %d, less than threshold %f" % (len(neg_set_x_ori), scoreOfNegOri)
+
+        # print ">>> other negtive test set"
+        scoreOfNegOth = _score_of_set(neg_set_x_oth, pos=False)
+        # print ">>> total negtive set %d, less than threhold %f" % (len(neg_set_x_oth), scoreOfNegOth)
+
+        return scoreOfPos, scoreOfNegOri, scoreOfNegOth
+
+    def score(self):
+        self.load_feature()
+        scoreOfPos = []
+        scoreOfNegOri = []
+        scoreOfNegOth = []
+        for uid in range(40):
+            pos, negOri, negOth = self.score_of_uid(uid, 15)
+            scoreOfPos.append(pos)
+            scoreOfNegOri.append(negOri)
+            scoreOfNegOth.append(negOth)
+        print numpy.mean(scoreOfPos), numpy.mean(scoreOfNegOri), numpy.mean(scoreOfNegOth)
 
 class JaccardDriver(Driver):
     """
@@ -396,7 +422,8 @@ def test_jaccard_driver():
     print numpy.mean(results)
 
 if __name__ == "__main__":
-    test_jaccard_driver()
+    test_auto_driver()
+    # test_jaccard_driver()
 
 
 
