@@ -186,7 +186,7 @@ class AutoEncoderDriver(Driver):
             data.append(uidData)
         self.data = data
 
-    def train(self):
+    def train(self, layer_sizes=[500, 300, 100, 50, 20, 10], epoch=20):
         if not self.data:
             self.imagize()
 
@@ -194,10 +194,9 @@ class AutoEncoderDriver(Driver):
         (uCnt, sCnt, pCnt) = train_set_x.shape
         train_set_x = train_set_x.reshape((uCnt*sCnt, pCnt))
 
-        layer_sizes = [500, 300, 100]
         n_ins = (self.width + 1) * (self.height + 1)
         # train data
-        self.featureExtractor.train(train_set_x, n_ins, layer_sizes)
+        self.featureExtractor.train(train_set_x, n_ins, layer_sizes, epoch)
 
     def generate_features(self):
         """
@@ -211,7 +210,6 @@ class AutoEncoderDriver(Driver):
         for uid in range(40):
             uidFeatures = []
             for sid in range(40):
-                layer_sizes = [500, 300, 100]
                 feature = self.featureExtractor.generate_features(
                         self.data[uid][sid])
                 uidFeatures.append(feature)
@@ -313,12 +311,13 @@ class AutoEncoderDriver(Driver):
         scoreOfPos = []
         scoreOfNegOri = []
         scoreOfNegOth = []
-        for uid in range(40):
-            pos, negOri, negOth = self.score_of_uid(uid, 15)
-            scoreOfPos.append(pos)
-            scoreOfNegOri.append(negOri)
-            scoreOfNegOth.append(negOth)
-        print numpy.mean(scoreOfPos), numpy.mean(scoreOfNegOri), numpy.mean(scoreOfNegOth)
+        for cnt in [3, 5, 7, 10, 15]:
+            for uid in range(40):
+                pos, negOri, negOth = self.score_of_uid(uid, cnt)
+                scoreOfPos.append(pos)
+                scoreOfNegOri.append(negOri)
+                scoreOfNegOth.append(negOth)
+            print numpy.mean(scoreOfPos), numpy.mean(scoreOfNegOri), numpy.mean(scoreOfNegOth)
 
 class JaccardDriver(Driver):
     """

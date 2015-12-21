@@ -574,7 +574,7 @@ class AutoEncoderFeatureExtractor(FeatureExtractor):
         image = image.reshape((self.height+1)*(self.width+1))
         return image
 
-    def train(self, image_set, n_ins, layer_sizes):
+    def train(self, image_set, n_ins, layer_sizes, epoch):
         """
         train model
         """
@@ -583,7 +583,7 @@ class AutoEncoderFeatureExtractor(FeatureExtractor):
             train_set_x = numpy.asarray(train_set_x)
 
         self.autoDriver.train(train_set_x, n_ins=n_ins,
-                hidden_layers_sizes=layer_sizes)
+                hidden_layers_sizes=layer_sizes, pretraining_epochs=epoch)
 
     def generate_features(self, image):
         """
