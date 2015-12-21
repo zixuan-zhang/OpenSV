@@ -8,7 +8,7 @@ from settings import DCT_DIMENTION_NUM
 from decorators import param_length_matcher
 from processor import SVMProcessor, PreProcessor
 
-from auto_encoder import get_features_using_autoencoder
+from auto_encoder import StackedAutoEncoderDriver
 
 class DCTFeatureExtractor(object):
     def __init__(self):
@@ -558,6 +558,8 @@ class AutoEncoderFeatureExtractor(FeatureExtractor):
         self.width = width
         self.height = height
 
+        self.autoDriver = StackedAutoEncoderDriver()
+
     def imagize(self, X, Y):
         """
         generate imagize data from coordinates
@@ -568,13 +570,23 @@ class AutoEncoderFeatureExtractor(FeatureExtractor):
 
         image = numpy.zeros((self.height+1, self.width+1))
         for (x,y) in zip(X, Y):
-            image[self.height-y][x] = 1
+            image[self.height-y][x] = 1.
         image = image.reshape((self.height+1)*(self.width+1))
         return image
 
-    def generate_features(self, image, layer_sizes):
+    def train(self, image_set, n_ins, layer_sizes):
         """
+        train model
+        """
+        train_set_x = image_set
+        if isinstance(train_set_x, list):
+            train_set_x = numpy.asarray(train_set_x)
 
+        self.autoDriver.train(train_set_x, n_ins=n_ins,
+                hidden_layers_sizes=layer_sizes)
+
+    def generate_features(self, image):
         """
-        features = get_features_using_autoencoder(image, layer_sizes)
+        """
+        features = self.autoDriver.get_features(image)
         return features
