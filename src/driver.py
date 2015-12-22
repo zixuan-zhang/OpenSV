@@ -4,6 +4,7 @@
 import sys, os
 import numpy
 import json
+import math
 
 from sklearn import svm
 from sklearn import tree
@@ -135,7 +136,26 @@ class ProbDriver(Driver):
             self.meanF.append(numpy.mean(F))
             self.varF.append(numpy.var(F))
 
-class AutoEncoderDriver(Driver):
+class AutoEncoderFeatureDriver(Driver):
+
+    def __init__(self):
+
+        self.data = []
+        self.features = []
+
+    def load_feature(self, fileDir = None):
+        if not fileDir:
+            fileDir = "../data/auto_features"
+        os.chdir(fileDir)
+        for uid in range(40):
+            uidFeatures = []
+            for sid in range(40):
+                fileName = "u%ds%d.txt" % (uid, sid)
+                feature = numpy.loadtxt(fileName)
+                uidFeatures.append(feature)
+            self.features.append(uidFeatures)
+
+class AutoEncoderDriver(AutoEncoderFeatureDriver):
 
     def __init__(self):
         # data structure
@@ -230,17 +250,6 @@ class AutoEncoderDriver(Driver):
                 numpy.savetxt(fileName, self.features[uid][sid],fmt="%10.5f")
         os.chdir("../..")
 
-    def load_feature(self, fileDir = None):
-        if not fileDir:
-            fileDir = "../data/auto_features"
-        os.chdir(fileDir)
-        for uid in range(40):
-            uidFeatures = []
-            for sid in range(40):
-                fileName = "u%ds%d.txt" % (uid, sid)
-                feature = numpy.loadtxt(fileName)
-                uidFeatures.append(feature)
-            self.features.append(uidFeatures)
 
     def train_test_set(self, uid, cnt):
         uidFeatures = self.features[uid]
@@ -354,6 +363,71 @@ class JaccardDriver(Driver):
         newTestSet = [round(x) for x in test_set]
         res = sum([1 if newTestSet[i] == self.genuineFeature[i] else 0 for i in range(self.featureSize)])
         return float(res) / self.featureSize 
+
+class SimilarityDriver(AutoEncoderFeatureDriver):
+    """
+    This class define a few methods to calculate similarity
+    """
+
+    def __init__(self):
+        pass
+
+    def cos_distance(self, X, Y):
+        assert len(X) == len(Y)
+        partUp = 0.0
+        xSqr = 0.0
+        ySqr = 0.0
+        for x, y in zip(X, Y):
+            partUp += x * y
+            xSqr += x ** 2
+            ySqr += y ** 2
+        partDown = math.sqrt(xSqr * ySqr)
+        if partDown == 0:
+            return None
+        else:
+            return partUp / partDown
+
+    def group_similarity(self, samples, compares):
+        """
+        samples和compares均为多个样本集。本函数将计算sample * compares组合
+        的distance
+        """
+        distances = []
+
+        for sample in samples:
+            for compare in compares:
+                distance = self.cos_distance(sample, compare)
+                distances.append(distance)
+        return distances
+
+    def similarity_distrubution(self, uid, sCnt):
+        """
+        三种签名：
+            1. 正确的签名(Genuine Signatures)
+            2. 伪造的签名(Forged Signatures)
+            3. 普通签名(Regular Signatures)
+
+        假设已经确定的正确的签名为sample，现在需要求出其他Genuine Signature、
+            Forged Signatures、Regular Signatures 与sample的距离。
+        其中这四类都为集合，所以得出的距离也是list类型，其中是每个待检测签名
+            与sample的距离的集合
+        """
+        if not self.features:
+            self.load_feature()
+        sample = self.features[uid][0:sCnt]
+
+        genuineSigs = self.features[uid][sCnt:20]
+        forgedSigOri = self.features[uid][20:40]
+        forgedSigOth = []
+        for u in range(40):
+            if uid != u:
+                forgedSigOth.extend(self.features[uid])
+
+        genuineDis = self.group_similarity(sample, genuineSigs)
+        forgedSigOriDis = self.group_similarity(sample, forgedSigOri)
+        forgedSigOthDis = self.group_similarity(sample, forgedSigOth)
+
+        return genuineDis, forgedSigOriDis, forgedSigOthDis
 
 def get_training_data(svmDriver):
     print "loading training data"
