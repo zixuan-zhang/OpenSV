@@ -9,10 +9,11 @@
 '''
 
 import os
-#import matplotlib.pyplot as plt
+import numpy
+import matplotlib.pyplot as plt
 
 import settings
-from driver import AutoEncoderDriver
+from driver import AutoEncoderDriver, SimilarityDriver
 
 def _input_uid():
     while True:
@@ -40,13 +41,16 @@ def _input_sid():
             print "input illegal, please retype"
             continue
 
-def autoencoder_view_features():
+def autoencoder_view_features(loadFromDump=False):
     driver = AutoEncoderDriver()
-    driver.load_data()
-    driver.size_normalization()
-    driver.imagize()
-    driver.generate_features()
-    driver.dump_feature()
+    if not loadFromDump:
+        driver.load_data()
+        driver.size_normalization()
+        driver.imagize()
+        driver.generate_features()
+        driver.dump_feature()
+    else:
+        driver.load_feature()
     while True:
         uid = _input_uid()
         sid = _input_sid()
@@ -84,9 +88,33 @@ def autoencoder_view():
             print 
         print 
 
+def auto_feature_similarity_view(uid, cnt):
+    """
+    这个函数显示以uid为sample, 其他笔记与sample的距离
+    """
+    similarityDriver = SimilarityDriver()
+    sampleDis, genuineDis, forgedSigOriDis, forgedSigOthDis = similarityDriver.similarity_distrubution(uid, cnt)
+
+    count = 0
+    sampleX = range(count, len(sampleDis) + count)
+    count += len(sampleX)
+    genuineX = range(count, len(genuineDis) + count)
+    count += len(genuineDis)
+    forgedSigOriX = range(count, len(forgedSigOriDis) + count)
+    count += len(forgedSigOriDis)
+    forgedSigOthX = range(count, len(forgedSigOthDis) + count)
+
+    plt.scatter(sampleX, sampleDis, color="green") 
+    plt.scatter(genuineX, genuineDis, color="red")
+    plt.scatter(forgedSigOriX, forgedSigOriDis, color="blue")
+    plt.scatter(forgedSigOthX, forgedSigOthDis, color="black")
+    plt.show()
+
 def draw_plot(X, Y):
     plt.plot(X, Y)
     plt.show()
 
+
 if __name__ == "__main__":
-    autoencoder_view_features()
+    #autoencoder_view_features(True)
+    auto_feature_similarity_view(0, 5)

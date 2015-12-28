@@ -5,6 +5,8 @@ import sys, os
 import numpy
 import json
 import math
+import scipy
+import copy
 
 from sklearn import svm
 from sklearn import tree
@@ -369,8 +371,9 @@ class SimilarityDriver(AutoEncoderFeatureDriver):
     This class define a few methods to calculate similarity
     """
 
-    def __init__(self):
-        pass
+    def euclid_distance(self, X, Y):
+        assert len(X) == len(Y)
+        return scipy.spatial.distance.euclidean(X, Y)
 
     def cos_distance(self, X, Y):
         assert len(X) == len(Y)
@@ -387,6 +390,29 @@ class SimilarityDriver(AutoEncoderFeatureDriver):
         else:
             return partUp / partDown
 
+    def sample_avg(self, samples):
+        _sum = copy.deepcopy(samples[0]) # Here needs deep copy
+        for i in range(1, len(samples)):
+            for j in range(len(_sum)):
+                _sum[j] += samples[i][j]
+        for i in range(len(_sum)):
+            _sum[i] /= len(samples)
+        return _sum
+
+    def avg_similarity(self, compares):
+        """
+        这种求相似度方法先求出samples的平均值，然后compares与avg求相似度distance
+        """
+        distances = []
+        for compare in compares:
+            distance = self.euclid_distance(self.avgFeatures, compare)
+            if distance == 0.0:
+                print "same"
+                print self.avgFeatures
+                print compare
+            distances.append(distance)
+        return distances
+
     def group_similarity(self, samples, compares):
         """
         samples和compares均为多个样本集。本函数将计算sample * compares组合
@@ -396,7 +422,8 @@ class SimilarityDriver(AutoEncoderFeatureDriver):
 
         for sample in samples:
             for compare in compares:
-                distance = self.cos_distance(sample, compare)
+                # distance = self.cos_distance(sample, compare)
+                distance = self.euclid_distance(sample, compare)
                 distances.append(distance)
         return distances
 
@@ -412,6 +439,7 @@ class SimilarityDriver(AutoEncoderFeatureDriver):
         其中这四类都为集合，所以得出的距离也是list类型，其中是每个待检测签名
             与sample的距离的集合
         """
+
         if not self.features:
             self.load_feature()
         sample = self.features[uid][0:sCnt]
@@ -421,13 +449,115 @@ class SimilarityDriver(AutoEncoderFeatureDriver):
         forgedSigOth = []
         for u in range(40):
             if uid != u:
-                forgedSigOth.extend(self.features[uid])
+                forgedSigOth.extend(self.features[u])
 
-        genuineDis = self.group_similarity(sample, genuineSigs)
-        forgedSigOriDis = self.group_similarity(sample, forgedSigOri)
-        forgedSigOthDis = self.group_similarity(sample, forgedSigOth)
+        similarity = "avg"
+        if "group" == similarity:
+            sampleDis = self.group_similarity(sample, sample)
+            genuineDis = self.group_similarity(sample, genuineSigs)
+            forgedSigOriDis = self.group_similarity(sample, forgedSigOri)
+            forgedSigOthDis = self.group_similarity(sample, forgedSigOth)
+        elif "avg" == similarity:
+            self.avgFeatures = self.sample_avg(sample)
+            sampleDis = self.avg_similarity(sample)
+            genuineDis = self.avg_similarity(genuineSigs)
+            forgedSigOriDis = self.avg_similarity(forgedSigOri)
+            forgedSigOthDis = self.avg_similarity(forgedSigOth)
 
-        return genuineDis, forgedSigOriDis, forgedSigOthDis
+        return sampleDis, genuineDis, forgedSigOriDis, forgedSigOthDis
+
+class SimilarityProbDriver(AutoEncoderFeatureDriver):
+
+    """
+    这个类的思想借鉴Probablistic Model.
+        1. 根据train features求出 average feature
+        2. 每个train feature求出根average feature的距离
+        3. 求出上面距离最大的那个，然后乘以rate作为阈值
+        3. test feature与average feature求距离，如果小于阈值则为正，反之为负
+
+    Usage:
+        driver = SimilarityProbDriver()
+        driver.train(trainFeatureList)
+        result = driver.test(testFeatureList)
+    """
+
+    def __init__(self):
+        AutoEncoderFeatureDriver.__init__(self)
+        self.rate = 1.5 # mean the times of max distance of training example
+
+    def _euclid_distance(self, X, Y):
+        assert len(X) == len(Y)
+        return scipy.spatial.distance.euclidean(X, Y)
+
+    def _sample_avg(self, samples):
+        _sum = copy.deepcopy(samples[0]) # Here need deep copy
+        for i in range(1, len(samples)):
+            for j in range(len(_sum)):
+                _sum[j] += samples[i][j]
+        for i in range(len(_sum)):
+            _sum[i] /= len(samples)
+        return _sum
+
+    def train(self, trainFeatures):
+        self.distanceThreshold= None
+
+        self.featureAvg = self._sample_avg(trainFeatures)
+        trainDis = []
+        for features in trainFeatures:
+            distance = self._euclid_distance(self.featureAvg, features)
+            trainDis.append(distance)
+        maxDis = max(trainDis)
+        self.distanceThreshold = maxDis * self.rate
+
+    def predict(self, testFeatures):
+        results = []
+        for features in testFeatures:
+            distance = self._euclid_distance(self.featureAvg, features)
+            result = True if distance <= self.distanceThreshold else False
+            results.append(result)
+        return results
+
+    def one_user_test(self, uid=0, sCnt=5):
+
+        if not self.features:
+            self.load_feature()
+        sample = self.features[uid][0:sCnt]
+
+        genuineSigs = self.features[uid][sCnt:20]
+        forgedSigOri = self.features[uid][20:40]
+        forgedSigOth = []
+        for u in range(40):
+            if uid != u:
+                forgedSigOth.extend(self.features[u])
+
+        # training process
+        self.train(sample)
+
+        # test process
+        results = self.predict(genuineSigs)
+        gscore = sum([1 if x == True else 0 for x in results]) / float(len(genuineSigs))
+
+        results = self.predict(forgedSigOri)
+        fscore = sum([1 if x == True else 0 for x in results]) / float(len(forgedSigOri))
+
+        results = self.predict(forgedSigOth)
+        rscore = sum([1 if x == False else 0 for x in results]) / float(len(forgedSigOth))
+
+        print "gscore is %f, fscore is %f, rscore is %f" % (gscore, fscore, rscore)
+        return gscore, fscore, rscore
+
+    def test(self):
+        gscores = []
+        fscores = []
+        rscores = []
+        for uid in range(40):
+            gscore, fscore, rscore = self.one_user_test(uid, 5)
+            gscores.append(gscore)
+            fscores.append(fscore)
+            rscores.append(rscore)
+        print "final score"
+        print "gscore is %f, fscore is %f, rscore is %f" % (numpy.mean(gscores),
+                numpy.mean(fscores), numpy.mean(rscores))
 
 def get_training_data(svmDriver):
     print "loading training data"
@@ -509,11 +639,18 @@ def test_jaccard_driver():
         results.append(res)
     print numpy.mean(results)
 
+def test_similarity_prob_driver():
+    """
+    测试similarity driver，获得认证效果
+    """
+    similarityDriver = SimilarityDriver()
+
+
 if __name__ == "__main__":
-    test_auto_driver()
+    # test_auto_driver()
     # test_jaccard_driver()
-
-
+    driver = SimilarityProbDriver()
+    driver.test()
 
     """
     svmDriver = ProbDriver()
