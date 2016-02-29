@@ -163,11 +163,10 @@ class AutoEncoderDriver(AutoEncoderFeatureDriver):
         # data structure
         self.data = []
         self.features = []
-        self.width = 30
-        self.height = 30
+        self.width = 27
+        self.height = 27
         self.featureExtractor = AutoEncoderFeatureExtractor(self.width, self.height)
         self.processor = PreProcessor()
-
         self.driver = ProbDriver()
 
     def load_data(self):
@@ -208,7 +207,7 @@ class AutoEncoderDriver(AutoEncoderFeatureDriver):
             data.append(uidData)
         self.data = data
 
-    def train(self, layer_sizes=[500, 300, 100, 50, 20, 10], epoch=20):
+    def train(self, layer_sizes=[500, 300, 100, 50], epoch=1000):
         if not self.data:
             self.imagize()
 
@@ -218,7 +217,10 @@ class AutoEncoderDriver(AutoEncoderFeatureDriver):
 
         n_ins = (self.width + 1) * (self.height + 1)
         # train data
-        self.featureExtractor.train(train_set_x, n_ins, layer_sizes, epoch)
+        # self.featureExtractor.train(train_set_x, n_ins, layer_sizes, epoch)
+        self.featureExtractor.train_with_mnist(pretraining_epochs=15,
+                training_epochs=epoch,
+                hidden_layers_sizes=layer_sizes)
 
     def generate_features(self):
         """
@@ -228,6 +230,7 @@ class AutoEncoderDriver(AutoEncoderFeatureDriver):
         # train data first
         self.train()
 
+        print "generating features..."
         self.features = []
         for uid in range(40):
             uidFeatures = []
@@ -235,7 +238,7 @@ class AutoEncoderDriver(AutoEncoderFeatureDriver):
                 feature = self.featureExtractor.generate_features(
                         self.data[uid][sid])
                 uidFeatures.append(feature)
-                print ">>>uid: %d, sid: %d ends" % (uid, sid)
+                # print ">>>uid: %d, sid: %d ends" % (uid, sid)
             self.features.append(uidFeatures)
 
     def dump_feature(self):

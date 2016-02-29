@@ -585,6 +585,12 @@ class AutoEncoderFeatureExtractor(FeatureExtractor):
         self.autoDriver.train(train_set_x, n_ins=n_ins,
                 hidden_layers_sizes=layer_sizes, pretraining_epochs=epoch)
 
+    def train_with_mnist(self, pretraining_epochs=15, training_epochs=1000,
+            hidden_layers_sizes=[500, 300, 100, 50]):
+        self.autoDriver.train_with_mnist(pretraining_epochs=pretraining_epochs,
+                training_epochs=training_epochs,
+                hidden_layers_sizes=hidden_layers_sizes)
+
     def generate_features(self, image):
         """
         """

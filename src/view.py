@@ -10,7 +10,7 @@
 
 import os
 import numpy
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 
 import settings
 from driver import AutoEncoderDriver, SimilarityDriver
@@ -116,5 +116,5 @@ def draw_plot(X, Y):
 
 
 if __name__ == "__main__":
-    #autoencoder_view_features(True)
-    auto_feature_similarity_view(0, 5)
+    autoencoder_view_features(False)
+    #auto_feature_similarity_view(0, 5)
