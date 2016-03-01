@@ -4,6 +4,7 @@ import os
 import numpy
 
 from sklearn import svm
+from sklearn import tree
 
 import utils
 
@@ -46,6 +47,89 @@ class DynamicTimeWrappingSimilarity(Similarity):
         Simy = self.calculate(Ay, By)
         return (Simx + Simy) / 2
 
+class PersonTest():
+    def __init__(self, refSigs):
+        self.refSigs = refSigs
+        self.refCount = len(refSigs)
+        self.templateSig = None
+
+        self.similarity = DynamicTimeWrappingSimilarity()
+        # 选择template signature
+        self.select_template()
+        # 计算base distance
+        self.calc_base_dis()
+
+    def select_template(self):
+        print "selecting template signature"
+
+        refDis = []
+        for i in range(self.refCount):
+            Xi = self.refSigs[i][0]
+            Yi = self.refSigs[i][1]
+            dis = 0.0
+            for j in range(self.refCount):
+                if i == j:
+                    continue
+                Xj = self.refSigs[j][0]
+                Yj = self.refSigs[j][1]
+                dis += self.similarity.calculate_2D(Xi, Yi, Xj, Yj)
+            refDis.append(dis)
+
+        templateIndex = refDis.index(min(refDis))
+        print "template index : %d" % templateIndex
+        self.templateSig = self.refSigs.pop(templateIndex)
+        self.refCount -= 1
+
+    def calc_base_dis(self):
+        """
+        计算用于归一化的templateDis, minDis, maxDis
+        """
+        tempDisList = []
+        minDisList = []
+        maxDisList = []
+        tempX = self.templateSig[0]
+        tempY = self.templateSig[1]
+        for i in range(self.refCount):
+            Xi = self.refSigs[i][0]
+            Yi = self.refSigs[i][1]
+            tempDis = self.similarity.calculate_2D(Xi, Yi, tempX, tempY)
+            tempDisList.append(tempDis)
+
+            disList = []
+            for j in range(self.refCount):
+                if i == j:
+                    continue
+                Xj = self.refSigs[j][0]
+                Yj = self.refSigs[j][1]
+                dis = self.similarity.calculate_2D(Xi, Yi, Xj, Yj)
+                disList.append(dis)
+            minDisList.append(min(disList))
+            maxDisList.append(max(disList))
+
+        self.tempDis = numpy.mean(tempDisList)
+        self.minDis = numpy.mean(minDisList)
+        self.maxDis = numpy.mean(maxDisList)
+        print "templateDis %f, minDis %f, maxDis %f" % (self.tempDis,
+                self.minDis, self.maxDis)
+
+    def calc_dis(self, X, Y):
+        """
+        对于任意signature样本，计算template distance, min distance, max distance
+        的归一化后的结果
+        """
+        tempX = self.templateSig[0]
+        tempY = self.templateSig[1]
+        tempDis = self.similarity.calculate_2D(X, Y, tempX, tempY)
+
+        disList = []
+        for sig in self.refSigs:
+            Rx = sig[0]
+            Ry = sig[1]
+            dis = self.similarity.calculate_2D(X, Y, Rx, Ry)
+            disList.append(dis)
+        maxDis = max(disList)
+        minDis = min(disList)
+        return [maxDis/self.maxDis, minDis/self.minDis, tempDis/self.tempDis]
 
 class PersonTraining():
     def __init__(self, signatures):
@@ -68,21 +152,23 @@ class PersonTraining():
         self.calc_base_dis()
 
     def select_template(self):
-        refDis = []
+        print "selecting template signature"
 
-        for i in range(8):
+        refDis = []
+        for i in range(self.refCount):
             Xi = self.reference[i][0]
             Yi = self.reference[i][1]
             dis = 0.0
-            for j in range(8):
+            for j in range(self.refCount):
                 if i == j:
                     continue
                 Xj = self.reference[j][0]
                 Yj = self.reference[j][1]
-                dis = self.similarity.calculate_2D(Xi, Yi, Xj, Yj)
+                dis += self.similarity.calculate_2D(Xi, Yi, Xj, Yj)
             refDis.append(dis)
 
-        templateIndex = refDis.insert(min(refDis))
+        templateIndex = refDis.index(min(refDis))
+        print "template index : %d" % templateIndex
         self.templateSig = self.reference.pop(templateIndex)
         self.refCount -= 1
 
@@ -103,16 +189,20 @@ class PersonTraining():
 
             disList = []
             for j in range(self.refCount):
+                if i == j:
+                    continue
                 Xj = self.reference[j][0]
                 Yj = self.reference[j][1]
                 dis = self.similarity.calculate_2D(Xi, Yi, Xj, Yj)
-                disList.append(disList)
+                disList.append(dis)
             minDisList.append(min(disList))
             maxDisList.append(max(disList))
 
         self.tempDis = numpy.mean(tempDisList)
         self.minDis = numpy.mean(minDisList)
         self.maxDis = numpy.mean(maxDisList)
+        print "templateDis %f, minDis %f, maxDis %f" % (self.tempDis,
+                self.minDis, self.maxDis)
 
     def calc_dis(self, X, Y):
         """
@@ -152,14 +242,17 @@ class PersonTraining():
 
         return genuineDis, forgeryDis
 
-def Driver():
-
+class Driver():
     def __init__(self):
         signatures = self.get_data()
+        print "Total signatures: %d" % len(signatures)
         signatures = self.calculate_delta(signatures)
-        train_set, test_set = self.train_test_split()
+        print "Calculating delta done"
+        self.train_set, self.test_set = self.train_test_split(signatures)
+        print "Spliting value set, training_set %d, test_set %d" % (len(self.train_set), len(self.test_set))
 
-        self.svm = svn.SVC()
+        # self.svm = svm.SVC()
+        self.svm = tree.DecisionTreeClassifier()
 
         genuineX = []
         forgeryX = []
@@ -168,42 +261,41 @@ def Driver():
         forgeryY = []
 
         # 现在就可以进入训练阶段了
-        for sigs in train_set:
+        for sigs in self.train_set:
             personTrain = PersonTraining(sigs)
-            geuinue, forgery = personTrain.calc_train_set())
+            genuine, forgery = personTrain.calc_train_set()
             genuineX.extend(genuine)
             forgeryX.extend(forgery)
 
         genuineY = [1] * len(genuineX)
         forgeryY = [0] * len(forgeryX)
         trainX = genuineX + forgeryX
-        trainY = genuineY = forgeryY
+        trainY = genuineY + forgeryY
 
         self.svm.fit(trainX, trainY)
 
-    def predict(self, X):
-        self.svm.predict(X)
-
-    def get_data():
+    def get_data(self):
         """
         获取签名样本
         """
+        print "Getting signatures"
         signatures = []
-        dataPath = "../data/data"
+        dataPath = "../data/Task2"
         for uid in range(1, 41):
             personSigs = []
             for sig in range(1, 41):
-                fileName = "U%dS%d.TXT"
+                fileName = "U%dS%d.TXT" % (uid, sig)
                 filePath = os.path.join(dataPath, fileName)
                 X, Y, T, P = utils.get_data_from_file(filePath)
-                personSig.append([X, Y])
+                personSigs.append([X, Y])
             signatures.append(personSigs)
         return signatures
 
-    def calculate_delta(signatures):
+    def calculate_delta(self, signatures):
         """
         将原始的x, y坐标变换为deltaX, deltaY
         """
+        print "Calculating x axis and y axis delta"
         result = []
         for personSigs in signatures:
             personRes = []
@@ -215,20 +307,37 @@ def Driver():
             result.append(personRes)
         return result
 
-    def train_test_split(signatures):
+    def train_test_split(self, signatures):
         """
         return training_set & test_set
         """
-        return signatures[0:20], signatures[21, 40]
+        trainCount = 10
+        return signatures[0:trainCount], signatures[trainCount:40]
+
+    def test(self):
+        test_set = self.test_set[0:2]
+        for one_test_set in test_set:
+            personTest = PersonTest(one_test_set[0:8])
+            genuine_set = one_test_set[8:20]
+            forgery_set = one_test_set[20:40]
+
+            print "genuine sig test"
+            for sig in genuine_set:
+                X = sig[0]
+                Y = sig[1]
+                dis = personTest.calc_dis(X, Y)
+                print self.svm.predict(dis)
+
+            print "forgery sig test"
+            for sig in forgery_set:
+                X = sig[0]
+                Y = sig[1]
+                dis = personTest.calc_dis(X, Y)
+                print self.svm.predict(dis)
 
 def test_DTW():
-    X = [3, 5, 6, 7, 7, 1]
-    Y = [3, 6, 6, 7, 8, 1, 1]
-    Z = [2, 5, 7, 7, 7, 7, 2]
-
-    dtw = DynamicTimeWrappingSimilarity(0,1)
-    dtw.calculate(X, Y)
-    dtw.calculate(X, Z)
+    driver = Driver()
+    driver.test()
 
 if __name__ == "__main__":
    test_DTW() 

@@ -1,6 +1,6 @@
 #coding:utf-8
 
-def get_data_from_file(self, filePath):
+def get_data_from_file(filePath):
     """
     load data from file
     :type filePath :string
