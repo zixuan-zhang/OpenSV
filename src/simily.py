@@ -5,8 +5,10 @@ import numpy
 
 from sklearn import svm
 from sklearn import tree
+from sklearn.ensemble import RandomForestClassifier
 
 import utils
+import processor
 
 class Similarity(object):
 
@@ -19,6 +21,9 @@ class DynamicTimeWrappingSimilarity(Similarity):
         """
         朴素的动归算法
         """
+        penalization = 5
+        theshold = 5
+
         len1 = len(A)
         len2 = len(B)
 
@@ -34,8 +39,17 @@ class DynamicTimeWrappingSimilarity(Similarity):
 
         for i in range(1, len1):
             for j in range(1, len2):
+                """
+                # method 1
                 distance[i][j] = min([distance[i-1][j], distance[i][j-1],
                         distance[i-1][j-1]]) + abs(A[i]-B[j])
+                """
+
+                d1 = distance[i-1][j] + penalization
+                d2 = distance[i][j-1] + penalization
+                other = 0 if (abs(A[i] - B[j]) < theshold) else (abs(A[i] - B[j]) - theshold)
+                d3 = distance[i-1][j-1] + other
+                distance[i][j] = min([d1, d2, d3])
 
         return distance[len1-1][len2-1]
 
@@ -60,7 +74,6 @@ class PersonTest():
         self.calc_base_dis()
 
     def select_template(self):
-        print "selecting template signature"
 
         refDis = []
         for i in range(self.refCount):
@@ -244,7 +257,9 @@ class PersonTraining():
 
 class Driver():
     def __init__(self):
+
         signatures = self.get_data()
+        signatures = self.pre_process(signatures)
         print "Total signatures: %d" % len(signatures)
         signatures = self.calculate_delta(signatures)
         print "Calculating delta done"
@@ -252,7 +267,8 @@ class Driver():
         print "Spliting value set, training_set %d, test_set %d" % (len(self.train_set), len(self.test_set))
 
         # self.svm = svm.SVC()
-        self.svm = tree.DecisionTreeClassifier()
+        # self.svm = tree.DecisionTreeClassifier()
+        self.svm = RandomForestClassifier(n_estimators=50)
 
         genuineX = []
         forgeryX = []
@@ -273,6 +289,23 @@ class Driver():
         trainY = genuineY + forgeryY
 
         self.svm.fit(trainX, trainY)
+
+    def pre_process(self, signatures):
+        """
+        apply size normalization and localtion normalization
+        """
+        self.processor = processor.PreProcessor()
+        result = []
+        for uid in range(40):
+            uSigs = []
+            for sid in range(40):
+                X = signatures[uid][sid][0]
+                Y = signatures[uid][sid][1]
+                RX, RY = self.processor.size_normalization(X, Y, 400, 200)
+                RX, RY = self.processor.location_normalization(RX, RY)
+                uSigs.append([RX, RY])
+            result.append(uSigs)
+        return result
 
     def get_data(self):
         """
@@ -311,29 +344,37 @@ class Driver():
         """
         return training_set & test_set
         """
-        trainCount = 10
+        trainCount = 20
         return signatures[0:trainCount], signatures[trainCount:40]
 
     def test(self):
-        test_set = self.test_set[0:2]
+        test_set = self.test_set
+        forgery_test_result = []
+        genuine_test_result = []
         for one_test_set in test_set:
             personTest = PersonTest(one_test_set[0:8])
             genuine_set = one_test_set[8:20]
             forgery_set = one_test_set[20:40]
 
-            print "genuine sig test"
             for sig in genuine_set:
                 X = sig[0]
                 Y = sig[1]
                 dis = personTest.calc_dis(X, Y)
-                print self.svm.predict(dis)
+                genuine_test_result.append(self.svm.predict(dis))
 
-            print "forgery sig test"
             for sig in forgery_set:
                 X = sig[0]
                 Y = sig[1]
                 dis = personTest.calc_dis(X, Y)
-                print self.svm.predict(dis)
+                forgery_test_result.append(self.svm.predict(dis))
+
+        print "genuine test set count: %d" % len(genuine_test_result)
+        print "true accepted count: %d" % sum(genuine_test_result)
+        print "false rejected rate: %f" % (sum(genuine_test_result) / float(len(genuine_test_result)))
+
+        print "forgery test set count: %d" % len(forgery_test_result)
+        print "false accepted count: %d" % sum(forgery_test_result)
+        print "false accepted rate: %f" % (1 - sum(forgery_test_result) / float(len(forgery_test_result)))
 
 def test_DTW():
     driver = Driver()

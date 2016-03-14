@@ -61,8 +61,8 @@ class PreProcessor(object):
         mX = width
         mY = height
 
-        resultX = [mX * (x - minX) / rangeX for x in X]
-        resultY = [mY * (y - minY) / rangeY for y in Y]
+        resultX = [float(mX) * (x - minX) / rangeX for x in X]
+        resultY = [float(mY) * (y - minY) / rangeY for y in Y]
         return resultX, resultY
 
     def gauss_smoothing(self, *params):
