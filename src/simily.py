@@ -1,6 +1,7 @@
 #coding: utf-8
 
 import os
+import logging
 import numpy
 
 from sklearn import svm
@@ -10,261 +11,215 @@ from sklearn.ensemble import RandomForestClassifier
 import utils
 import processor
 
-class Similarity(object):
+FORMAT = '%(asctime)s %(levelname)s %(name)s %(message)s'
+logging.basicConfig(filename = '../data/log', level = logging.INFO, format = FORMAT)
+LOGGER = logging.getLogger()
 
-    def calculate(self):
-        pass
+"""
+Singature Component:
+    'X': x axis
+    'Y': y axis
+    'VX': velocity of x axis
+    'VY': velocity of y axis
+"""
 
-class DynamicTimeWrappingSimilarity(Similarity):
+SigCompList = ["X", "Y", "VX", "VY"]
 
-    def naive_dtw(self, A, B):
-        """
-        朴素的动归算法
-        """
-        penalization = 5
-        theshold = 5
+def naive_dtw(A, B, p=5, t=5):
+    penalization = p
+    threshold = t
+    len1 = len(A)
+    len2 = len(B)
+    distance = numpy.zeros((len1, len2))
+    # initialize distance values
+    distance[0][0] = abs(A[0] - B[0])
+    for i in range(1, len1):
+        distance[i][0] = distance[i-1][0] + abs(A[i] - B[0])
 
-        len1 = len(A)
-        len2 = len(B)
+    for j in range(1, len2):
+        distance[0][j] = distance[0][j-1] + abs(A[0] - B[j])
 
-        distance = numpy.zeros((len1, len2))
-
-        # initialize distance values
-        distance[0][0] = abs(A[0] - B[0])
-        for i in range(1, len1):
-            distance[i][0] = distance[i-1][0] + abs(A[i] - B[0])
-
+    for i in range(1, len1):
         for j in range(1, len2):
-            distance[0][j] = distance[0][j-1] + abs(A[0] - B[j])
+            # method 1
+            distance[i][j] = min([distance[i-1][j], distance[i][j-1],
+                    distance[i-1][j-1]]) + abs(A[i]-B[j])
 
-        for i in range(1, len1):
-            for j in range(1, len2):
-                """
-                # method 1
-                distance[i][j] = min([distance[i-1][j], distance[i][j-1],
-                        distance[i-1][j-1]]) + abs(A[i]-B[j])
-                """
+            """
+            # method 2
+            d1 = distance[i-1][j] + penalization
+            d2 = distance[i][j-1] + penalization
+            other = 0 if (abs(A[i] - B[j]) < theshold) else (abs(A[i] - B[j]) - theshold)
+            d3 = distance[i-1][j-1] + other
+            distance[i][j] = min([d1, d2, d3])
+            """
 
-                d1 = distance[i-1][j] + penalization
-                d2 = distance[i][j-1] + penalization
-                other = 0 if (abs(A[i] - B[j]) < theshold) else (abs(A[i] - B[j]) - theshold)
-                d3 = distance[i-1][j-1] + other
-                distance[i][j] = min([d1, d2, d3])
+    return distance[len1-1][len2-1]
 
-        return distance[len1-1][len2-1]
+class Person(object):
 
-    def calculate(self, A, B):
-        return self.naive_dtw(A, B)
+    def __init__(self, refSigs, testSigs):
 
-    def calculate_2D(self, Ax, Ay, Bx, By):
-        Simx = self.calculate(Ax, Bx)
-        Simy = self.calculate(Ay, By)
-        return (Simx + Simy) / 2
-
-class PersonTest():
-    def __init__(self, refSigs):
         self.refSigs = refSigs
+        self.testSigs = testSigs
         self.refCount = len(refSigs)
+
         self.templateSig = None
 
-        self.similarity = DynamicTimeWrappingSimilarity()
-        # 选择template signature
+        # select template signature
         self.select_template()
-        # 计算base distance
+
+        # calculate base distance
         self.calc_base_dis()
 
     def select_template(self):
-
+        """
+        Just select template signature.
+        TODO: different signal with variant weight
+        """
+        LOGGER.info("selecting template signature")
         refDis = []
         for i in range(self.refCount):
-            Xi = self.refSigs[i][0]
-            Yi = self.refSigs[i][1]
             dis = 0.0
             for j in range(self.refCount):
                 if i == j:
                     continue
-                Xj = self.refSigs[j][0]
-                Yj = self.refSigs[j][1]
-                dis += self.similarity.calculate_2D(Xi, Yi, Xj, Yj)
+                comDisList = []
+                for com in SigCompList:
+                    signal1 = self.refSigs[i][com]
+                    signal2 = self.refSigs[j][com]
+                    comDisList.append(naive_dtw(signal1, signal2))
+                dis += numpy.mean(comDisList)
             refDis.append(dis)
-
         templateIndex = refDis.index(min(refDis))
-        print "template index : %d" % templateIndex
+        LOGGER.info("template index : %d" % templateIndex)
         self.templateSig = self.refSigs.pop(templateIndex)
         self.refCount -= 1
 
     def calc_base_dis(self):
         """
-        计算用于归一化的templateDis, minDis, maxDis
+        Calculate the base value in signal component of signatures
         """
-        tempDisList = []
-        minDisList = []
-        maxDisList = []
-        tempX = self.templateSig[0]
-        tempY = self.templateSig[1]
+        LOGGER.info("Calculating base distance")
+        self.base = {}
+
+        for com in SigCompList:
+            signalBaseList = []
+
+
+        for i in range(self.refCount):
+            for com in SigCompList:
+                signal1 = self.templateSig[com]
+                signal2 = self.refCount[i][com]
+
         for i in range(self.refCount):
             Xi = self.refSigs[i][0]
             Yi = self.refSigs[i][1]
-            tempDis = self.similarity.calculate_2D(Xi, Yi, tempX, tempY)
-            tempDisList.append(tempDis)
+            templateXDis = naive_dtw(Xi, templateX)
+            templateYDis = naive_dtw(Yi, templateY)
+            templateXList.append(templateXDis)
+            templateYList.append(templateYDis)
 
-            disList = []
+            xDisList = []
+            yDisList = []
             for j in range(self.refCount):
                 if i == j:
                     continue
                 Xj = self.refSigs[j][0]
                 Yj = self.refSigs[j][1]
-                dis = self.similarity.calculate_2D(Xi, Yi, Xj, Yj)
-                disList.append(dis)
-            minDisList.append(min(disList))
-            maxDisList.append(max(disList))
+                xDis = naive_dtw(Xi, Xj)
+                yDis = naive_dtw(Yi, Yj)
+                xDisList.append(xDis)
+                yDisList.append(yDis)
+            minXList.append(min(xDisList))
+            minYList.append(min(yDisList))
+            maxXList.append(max(xDisList))
+            maxYList.append(max(yDisList))
 
-        self.tempDis = numpy.mean(tempDisList)
-        self.minDis = numpy.mean(minDisList)
-        self.maxDis = numpy.mean(maxDisList)
-        print "templateDis %f, minDis %f, maxDis %f" % (self.tempDis,
-                self.minDis, self.maxDis)
+        self.baseTemplateXDis = numpy.mean(templateXList)
+        self.baseTemplateYDis = numpy.mean(templateYList)
+        self.baseMinXDis = numpy.mean(minXList)
+        self.baseMinYDis = numpy.mean(minYList)
+        self.baseMaxXDis = numpy.mean(maxXList)
+        self.baseMaxYDis = numpy.mean(maxYList)
+
+        LOGGER.info("Calculation done. baseTemplateX: %f, baseTemplateY: %f, baseMinX: %f, baseMinY: %f, baseMaxX: %f, baseMaxY: %f" % (self.baseTemplateXDis, self.baseTemplateYDis, self.baseMinXDis, self.baseMinYDis, self.baseMaxXDis, self.baseMaxYDis))
+
 
     def calc_dis(self, X, Y):
         """
-        对于任意signature样本，计算template distance, min distance, max distance
-        的归一化后的结果
+        For given signature, calculate vector[tempX, tempY, minX, minY, maxX, maxY] with normalization
         """
-        tempX = self.templateSig[0]
-        tempY = self.templateSig[1]
-        tempDis = self.similarity.calculate_2D(X, Y, tempX, tempY)
+        templateX = self.templateSig[0]
+        templateY = self.templateSig[1]
 
-        disList = []
+        templateXDis = naive_dtw(X, templateX)
+        templateYDis = naive_dtw(Y, templateY)
+
+        xDisList = []
+        yDisList = []
         for sig in self.refSigs:
-            Rx = sig[0]
-            Ry = sig[1]
-            dis = self.similarity.calculate_2D(X, Y, Rx, Ry)
-            disList.append(dis)
-        maxDis = max(disList)
-        minDis = min(disList)
-        return [maxDis/self.maxDis, minDis/self.minDis, tempDis/self.tempDis]
+            RX = sig[0]
+            RY = sig[1]
+            xDis = naive_dtw(X, RX)
+            yDis = naive_dtw(Y, RY)
+            xDisList.append(xDis)
+            yDisList.append(yDis)
+        minXDis = min(xDisList)
+        minYDis = min(yDisList)
+        maxXDis = max(xDisList)
+        maxYDis = max(yDisList)
 
-class PersonTraining():
+        return [templateXDis / self.baseTemplateXDis, templateYDis / self.baseTemplateYDis, minXDis / self.baseMinXDis, minYDis / self.baseMinYDis, maxXDis / self.baseMaxXDis, maxYDis / self.baseMaxYDis]
+
+
+class PersonTest(Person):
+    def __init__(self, refSigs):
+        super(PersonTest, self).__init__(refSigs, None)
+
+
+class PersonTraining(Person):
     def __init__(self, signatures):
         """
         suppose 40 signatures: 20 genuine & 20 forgeries
         """
         # eight reference signatures
-        self.reference = signatures[0:8]
-        self.refCount = 8
-        self.templateSig = None
+        super(PersonTraining, self).__init__(signatures[0:8], signatures[8:])
+        
+        self.genuineSigs = self.testSigs[:12]
+        self.forgerySigs = self.testSigs[12:]
 
-        self.genuineSigs = signatures[8:20]
-        self.forgerySigs = signatures[20:40]
-
-        self.similarity = DynamicTimeWrappingSimilarity()
-
-        # 选择template signature
-        self.select_template()
-        # 计算base distance
-        self.calc_base_dis()
-
-    def select_template(self):
-        print "selecting template signature"
-
-        refDis = []
-        for i in range(self.refCount):
-            Xi = self.reference[i][0]
-            Yi = self.reference[i][1]
-            dis = 0.0
-            for j in range(self.refCount):
-                if i == j:
-                    continue
-                Xj = self.reference[j][0]
-                Yj = self.reference[j][1]
-                dis += self.similarity.calculate_2D(Xi, Yi, Xj, Yj)
-            refDis.append(dis)
-
-        templateIndex = refDis.index(min(refDis))
-        print "template index : %d" % templateIndex
-        self.templateSig = self.reference.pop(templateIndex)
-        self.refCount -= 1
-
-    def calc_base_dis(self):
-        """
-        计算用于归一化的templateDis, minDis, maxDis
-        """
-        tempDisList = []
-        minDisList = []
-        maxDisList = []
-        tempX = self.templateSig[0]
-        tempY = self.templateSig[1]
-        for i in range(self.refCount):
-            Xi = self.reference[i][0]
-            Yi = self.reference[i][1]
-            tempDis = self.similarity.calculate_2D(Xi, Yi, tempX, tempY)
-            tempDisList.append(tempDis)
-
-            disList = []
-            for j in range(self.refCount):
-                if i == j:
-                    continue
-                Xj = self.reference[j][0]
-                Yj = self.reference[j][1]
-                dis = self.similarity.calculate_2D(Xi, Yi, Xj, Yj)
-                disList.append(dis)
-            minDisList.append(min(disList))
-            maxDisList.append(max(disList))
-
-        self.tempDis = numpy.mean(tempDisList)
-        self.minDis = numpy.mean(minDisList)
-        self.maxDis = numpy.mean(maxDisList)
-        print "templateDis %f, minDis %f, maxDis %f" % (self.tempDis,
-                self.minDis, self.maxDis)
-
-    def calc_dis(self, X, Y):
-        """
-        对于任意signature样本，计算template distance, min distance, max distance
-        的归一化后的结果
-        """
-        tempX = self.templateSig[0]
-        tempY = self.templateSig[1]
-        tempDis = self.similarity.calculate_2D(X, Y, tempX, tempY)
-
-        disList = []
-        for sig in self.reference:
-            Rx = sig[0]
-            Ry = sig[1]
-            dis = self.similarity.calculate_2D(X, Y, Rx, Ry)
-            disList.append(dis)
-        maxDis = max(disList)
-        minDis = min(disList)
-
-        return [maxDis/self.maxDis, minDis/self.minDis, tempDis/self.tempDis]
+        LOGGER.info("Reference signature count: %d, test signature count: %d, genuine test signatures: %d, forgery test signatures: %d" % (self.refCount, len(self.testSigs), len(self.genuineSigs), len(self.forgerySigs)))
 
     def calc_train_set(self):
         """
-        对于每个训练个体，计算该个体的正确的样本和伪造的样本集
+        For given training sets, calculate True samples & False samples
         """
-        genuineDis = []
-        forgeryDis = []
+        LOGGER.info("Calculating training vectors")
+        genuineVec = []
+        forgeryVec = []
 
         for genuine in self.genuineSigs:
-            Sx = genuine[0]
-            Sy = genuine[1]
-            genuineDis.append(self.calc_dis(Sx, Sy))
-        for forgery in self.forgerySigs:
-            Sx = forgery[0]
-            Sy = forgery[1]
-            forgeryDis.append(self.calc_dis(Sx, Sy))
+            X = genuine[0]
+            Y = genuine[1]
+            genuineVec.append(self.calc_dis(X, Y))
 
-        return genuineDis, forgeryDis
+        for forgery in self.forgerySigs:
+            X = forgery[0]
+            Y = forgery[1]
+            forgeryVec.append(self.calc_dis(X, Y))
+
+        return genuineVec, forgeryVec
 
 class Driver():
     def __init__(self):
 
         signatures = self.get_data()
         signatures = self.pre_process(signatures)
-        print "Total signatures: %d" % len(signatures)
-        signatures = self.calculate_delta(signatures)
-        print "Calculating delta done"
+        LOGGER.info("Total signatures: %d" % len(signatures))
+        signatures = self.reconstructSignatures(signatures)
         self.train_set, self.test_set = self.train_test_split(signatures)
-        print "Spliting value set, training_set %d, test_set %d" % (len(self.train_set), len(self.test_set))
+        LOGGER.info("Spliting value set, training_set %d, test_set %d" % (len(self.train_set), len(self.test_set)))
 
         # self.svm = svm.SVC()
         # self.svm = tree.DecisionTreeClassifier()
@@ -276,7 +231,7 @@ class Driver():
         genuineY = []
         forgeryY = []
 
-        # 现在就可以进入训练阶段了
+        # Training process
         for sigs in self.train_set:
             personTrain = PersonTraining(sigs)
             genuine, forgery = personTrain.calc_train_set()
@@ -311,7 +266,7 @@ class Driver():
         """
         获取签名样本
         """
-        print "Getting signatures"
+        LOGGER.info("Getting signatures")
         signatures = []
         dataPath = "../data/Task2"
         for uid in range(1, 41):
@@ -324,21 +279,23 @@ class Driver():
             signatures.append(personSigs)
         return signatures
 
-    def calculate_delta(self, signatures):
+    def reconstructSignatures(self, signatures):
         """
-        将原始的x, y坐标变换为deltaX, deltaY
+        Reconstruct signatures to dictionary like object.
         """
-        print "Calculating x axis and y axis delta"
-        result = []
-        for personSigs in signatures:
-            personRes = []
-            for sig in personSigs:
-                [X,Y] = sig
-                deltaX = [X[i]-X[i-1] for i in range(1, len(X))]
-                deltaY = [Y[i]-Y[i-1] for i in range(1, len(Y))]
-                personRes.append([deltaX, deltaY])
-            result.append(personRes)
-        return result
+        reconstructedSigs = []
+        for signature in signatures:
+            X = signature[0]
+            Y = signature[1]
+            VX = calculate_delta(X)
+            VY = calculate_delta(Y)
+            reconstructedSig = {"X": X, "Y": Y, "VX": VX, "VY": VY}
+            reconstructedSigs.append(reconstructedSig)
+        return reconstructedSigs
+
+    def calculate_delta(self, valueList):
+        deltaValueList = [valueList[i] - valueList[i-1] for i in range(1, len(valueList))]
+        return deltaValueList
 
     def train_test_split(self, signatures):
         """
@@ -368,13 +325,13 @@ class Driver():
                 dis = personTest.calc_dis(X, Y)
                 forgery_test_result.append(self.svm.predict(dis))
 
-        print "genuine test set count: %d" % len(genuine_test_result)
-        print "true accepted count: %d" % sum(genuine_test_result)
-        print "false rejected rate: %f" % (sum(genuine_test_result) / float(len(genuine_test_result)))
+        LOGGER.info("genuine test set count: %d" % len(genuine_test_result))
+        LOGGER.info("true accepted count: %d" % sum(genuine_test_result))
+        LOGGER.info("false rejected rate: %f" % (sum(genuine_test_result) / float(len(genuine_test_result))))
 
-        print "forgery test set count: %d" % len(forgery_test_result)
-        print "false accepted count: %d" % sum(forgery_test_result)
-        print "false accepted rate: %f" % (1 - sum(forgery_test_result) / float(len(forgery_test_result)))
+        LOGGER.info("forgery test set count: %d" % len(forgery_test_result))
+        LOGGER.info("false accepted count: %d" % sum(forgery_test_result))
+        LOGGER.info("false accepted rate: %f" % (1 - sum(forgery_test_result) / float(len(forgery_test_result))))
 
 def test_DTW():
     driver = Driver()
