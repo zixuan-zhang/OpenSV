@@ -3,6 +3,7 @@
 import os
 import logging
 import numpy
+import datetime
 
 from sklearn import svm
 from sklearn import tree
@@ -11,8 +12,9 @@ from sklearn.ensemble import RandomForestClassifier
 import utils
 import processor
 
+FILENAME = datetime.datetime.now().strftime("%Y%m%d%H%M.log")
 FORMAT = '%(asctime)s %(levelname)s %(name)s %(message)s'
-logging.basicConfig(filename = '../data/log', level = logging.INFO, format = FORMAT)
+logging.basicConfig(filename = "../data/%s" %FILENAME, level = logging.INFO, format = FORMAT)
 LOGGER = logging.getLogger()
 
 """
@@ -23,7 +25,23 @@ Singature Component:
     'VY': velocity of y axis
 """
 
+# Signal list which need to be considered
 SigCompList = ["X", "Y", "VX", "VY"]
+PENALIZATION = {
+        "X": 5,
+        "Y": 5,
+        "VX": 3,
+        "VY": 3
+        }
+THRESHOLD = {
+        "X": 2,
+        "Y": 2,
+        "VX": 2,
+        "VY": 2,
+        }
+LOGGER.info("Signal List: %s" % SigCompList)
+LOGGER.info("PENALIZATION: %s" % PENALIZATION)
+LOGGER.info("THRESHOLD: %s" % THRESHOLD)
 
 def naive_dtw(A, B, p=5, t=5):
     penalization = p
@@ -41,18 +59,17 @@ def naive_dtw(A, B, p=5, t=5):
 
     for i in range(1, len1):
         for j in range(1, len2):
+            """
             # method 1
             distance[i][j] = min([distance[i-1][j], distance[i][j-1],
                     distance[i-1][j-1]]) + abs(A[i]-B[j])
-
             """
             # method 2
             d1 = distance[i-1][j] + penalization
             d2 = distance[i][j-1] + penalization
-            other = 0 if (abs(A[i] - B[j]) < theshold) else (abs(A[i] - B[j]) - theshold)
+            other = 0 if (abs(A[i] - B[j]) < threshold) else (abs(A[i] - B[j]) - threshold)
             d3 = distance[i-1][j-1] + other
             distance[i][j] = min([d1, d2, d3])
-            """
 
     return distance[len1-1][len2-1]
 
@@ -88,7 +105,7 @@ class Person(object):
                 for com in SigCompList:
                     signal1 = self.refSigs[i][com]
                     signal2 = self.refSigs[j][com]
-                    comDisList.append(naive_dtw(signal1, signal2))
+                    comDisList.append(naive_dtw(signal1, signal2, PENALIZATION[com], THRESHOLD[com]))
                 dis += numpy.mean(comDisList)
             refDis.append(dis)
         templateIndex = refDis.index(min(refDis))
@@ -104,74 +121,47 @@ class Person(object):
         self.base = {}
 
         for com in SigCompList:
-            signalBaseList = []
+            templateComList = []
+            maxComList = []
+            minComList = []
+            for i in range(self.refCount):
+                comi = self.refSigs[i][com]
+                templateComDis = naive_dtw(comi, self.templateSig[com], PENALIZATION[com], THRESHOLD[com])
+                templateComList.append(templateComDis)
+                comDisList = []
+                for j in range(self.refCount):
+                    if i == j:
+                        continue
+                    comj = self.refSigs[j][com]
+                    comDisList.append(naive_dtw(comi, comj))
+                maxComList.append(max(comDisList))
+                minComList.append(min(comDisList))
+            self.base["template" + com] = numpy.mean(templateComList)
+            self.base["max"+com] = numpy.mean(maxComList)
+            self.base["min"+com] = numpy.mean(minComList)
+            LOGGER.info("Calculating signal: %s, baseTemplate: %f, baseMax: %f, baseMin: %f" %
+                    (com, self.base["template"+com], self.base["max"+com], self.base["min"+com]))
 
-
-        for i in range(self.refCount):
-            for com in SigCompList:
-                signal1 = self.templateSig[com]
-                signal2 = self.refCount[i][com]
-
-        for i in range(self.refCount):
-            Xi = self.refSigs[i][0]
-            Yi = self.refSigs[i][1]
-            templateXDis = naive_dtw(Xi, templateX)
-            templateYDis = naive_dtw(Yi, templateY)
-            templateXList.append(templateXDis)
-            templateYList.append(templateYDis)
-
-            xDisList = []
-            yDisList = []
-            for j in range(self.refCount):
-                if i == j:
-                    continue
-                Xj = self.refSigs[j][0]
-                Yj = self.refSigs[j][1]
-                xDis = naive_dtw(Xi, Xj)
-                yDis = naive_dtw(Yi, Yj)
-                xDisList.append(xDis)
-                yDisList.append(yDis)
-            minXList.append(min(xDisList))
-            minYList.append(min(yDisList))
-            maxXList.append(max(xDisList))
-            maxYList.append(max(yDisList))
-
-        self.baseTemplateXDis = numpy.mean(templateXList)
-        self.baseTemplateYDis = numpy.mean(templateYList)
-        self.baseMinXDis = numpy.mean(minXList)
-        self.baseMinYDis = numpy.mean(minYList)
-        self.baseMaxXDis = numpy.mean(maxXList)
-        self.baseMaxYDis = numpy.mean(maxYList)
-
-        LOGGER.info("Calculation done. baseTemplateX: %f, baseTemplateY: %f, baseMinX: %f, baseMinY: %f, baseMaxX: %f, baseMaxY: %f" % (self.baseTemplateXDis, self.baseTemplateYDis, self.baseMinXDis, self.baseMinYDis, self.baseMaxXDis, self.baseMaxYDis))
-
-
-    def calc_dis(self, X, Y):
+    def calc_dis(self, signature):
         """
-        For given signature, calculate vector[tempX, tempY, minX, minY, maxX, maxY] with normalization
+        For given signature, calculate vector[] with normalization
         """
-        templateX = self.templateSig[0]
-        templateY = self.templateSig[1]
-
-        templateXDis = naive_dtw(X, templateX)
-        templateYDis = naive_dtw(Y, templateY)
-
-        xDisList = []
-        yDisList = []
-        for sig in self.refSigs:
-            RX = sig[0]
-            RY = sig[1]
-            xDis = naive_dtw(X, RX)
-            yDis = naive_dtw(Y, RY)
-            xDisList.append(xDis)
-            yDisList.append(yDis)
-        minXDis = min(xDisList)
-        minYDis = min(yDisList)
-        maxXDis = max(xDisList)
-        maxYDis = max(yDisList)
-
-        return [templateXDis / self.baseTemplateXDis, templateYDis / self.baseTemplateYDis, minXDis / self.baseMinXDis, minYDis / self.baseMinYDis, maxXDis / self.baseMaxXDis, maxYDis / self.baseMaxYDis]
-
+        featureVec = []
+        for com in SigCompList:
+            comSig = signature[com]
+            comTem = self.templateSig[com]
+            templateComDis = naive_dtw(comSig, comTem, PENALIZATION[com], THRESHOLD[com])
+            comDisList = []
+            for i in range(self.refCount):
+                comI = self.refSigs[i][com]
+                dis = naive_dtw(comSig, comI, PENALIZATION[com], THRESHOLD[com])
+                comDisList.append(dis)
+            maxComDis = max(comDisList)
+            minComDis = min(comDisList)
+            featureVec.append(templateComDis / self.base["template"+com])
+            featureVec.append(maxComDis / self.base["max"+com])
+            featureVec.append(minComDis / self.base["min"+com])
+        return featureVec
 
 class PersonTest(Person):
     def __init__(self, refSigs):
@@ -200,14 +190,14 @@ class PersonTraining(Person):
         forgeryVec = []
 
         for genuine in self.genuineSigs:
-            X = genuine[0]
-            Y = genuine[1]
-            genuineVec.append(self.calc_dis(X, Y))
+            genuineV = self.calc_dis(genuine)
+            LOGGER.info("Genuine vector: %s" % genuineV)
+            genuineVec.append(genuineV)
 
         for forgery in self.forgerySigs:
-            X = forgery[0]
-            Y = forgery[1]
-            forgeryVec.append(self.calc_dis(X, Y))
+            forgeryV = self.calc_dis(forgery)
+            LOGGER.info("Forgery vector: %s" % forgeryV)
+            forgeryVec.append(forgeryV)
 
         return genuineVec, forgeryVec
 
@@ -247,7 +237,7 @@ class Driver():
 
     def pre_process(self, signatures):
         """
-        apply size normalization and localtion normalization
+        Apply size normalization and localtion normalization
         """
         self.processor = processor.PreProcessor()
         result = []
@@ -284,13 +274,16 @@ class Driver():
         Reconstruct signatures to dictionary like object.
         """
         reconstructedSigs = []
-        for signature in signatures:
-            X = signature[0]
-            Y = signature[1]
-            VX = calculate_delta(X)
-            VY = calculate_delta(Y)
-            reconstructedSig = {"X": X, "Y": Y, "VX": VX, "VY": VY}
-            reconstructedSigs.append(reconstructedSig)
+        for uid in range(40):
+            uSigs = []
+            for sid in range(40):
+                signature = signatures[uid][sid]
+                X = signature[0]
+                Y = signature[1]
+                VX = self.calculate_delta(X)
+                VY = self.calculate_delta(Y)
+                uSigs.append({"X": X, "Y": Y, "VX": VX, "VY": VY})
+            reconstructedSigs.append(uSigs)
         return reconstructedSigs
 
     def calculate_delta(self, valueList):
@@ -301,7 +294,7 @@ class Driver():
         """
         return training_set & test_set
         """
-        trainCount = 20
+        trainCount = 30
         return signatures[0:trainCount], signatures[trainCount:40]
 
     def test(self):
@@ -314,16 +307,16 @@ class Driver():
             forgery_set = one_test_set[20:40]
 
             for sig in genuine_set:
-                X = sig[0]
-                Y = sig[1]
-                dis = personTest.calc_dis(X, Y)
-                genuine_test_result.append(self.svm.predict(dis))
+                dis = personTest.calc_dis(sig)
+                res = self.svm.predict(dis)
+                LOGGER.info("Genuine Test: %s, Result: %s" % (dis, res))
+                genuine_test_result.append(res)
 
             for sig in forgery_set:
-                X = sig[0]
-                Y = sig[1]
-                dis = personTest.calc_dis(X, Y)
-                forgery_test_result.append(self.svm.predict(dis))
+                dis = personTest.calc_dis(sig)
+                res = self.svm.predict(dis)
+                LOGGER.info("Forgery Test: %s, Result: %s" % (dis, res))
+                forgery_test_result.append(res)
 
         LOGGER.info("genuine test set count: %d" % len(genuine_test_result))
         LOGGER.info("true accepted count: %d" % sum(genuine_test_result))
