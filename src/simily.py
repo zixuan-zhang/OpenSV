@@ -26,7 +26,8 @@ Singature Component:
 """
 
 # Signal list which need to be considered
-SigCompList = ["X", "Y", "VX", "VY"]
+SigCompList = ["VY"]
+#SigCompList = ["X", "Y", "VX", "VY"]
 PENALIZATION = {
         "X": 5,
         "Y": 5,
@@ -36,9 +37,14 @@ PENALIZATION = {
 THRESHOLD = {
         "X": 2,
         "Y": 2,
-        "VX": 2,
-        "VY": 2,
+        "VX": 1,
+        "VY": 1,
         }
+
+METHOD = 2
+TRAINING_SET_COUNT = 20
+LOGGER.info("TrainingSetCount: %d" % TRAINING_SET_COUNT)
+LOGGER.info("Method: %d" % METHOD)
 LOGGER.info("Signal List: %s" % SigCompList)
 LOGGER.info("PENALIZATION: %s" % PENALIZATION)
 LOGGER.info("THRESHOLD: %s" % THRESHOLD)
@@ -59,18 +65,16 @@ def naive_dtw(A, B, p=5, t=5):
 
     for i in range(1, len1):
         for j in range(1, len2):
-            """
-            # method 1
-            distance[i][j] = min([distance[i-1][j], distance[i][j-1],
-                    distance[i-1][j-1]]) + abs(A[i]-B[j])
-            """
-            # method 2
-            d1 = distance[i-1][j] + penalization
-            d2 = distance[i][j-1] + penalization
-            other = 0 if (abs(A[i] - B[j]) < threshold) else (abs(A[i] - B[j]) - threshold)
-            d3 = distance[i-1][j-1] + other
-            distance[i][j] = min([d1, d2, d3])
-
+            if METHOD == 1:
+                distance[i][j] = min([distance[i-1][j], distance[i][j-1],
+                        distance[i-1][j-1]]) + abs(A[i]-B[j])
+            elif METHOD == 2:
+                # method 2
+                d1 = distance[i-1][j] + penalization
+                d2 = distance[i][j-1] + penalization
+                other = 0 if (abs(A[i] - B[j]) < threshold) else (abs(A[i] - B[j]) - threshold)
+                d3 = distance[i-1][j-1] + other
+                distance[i][j] = min([d1, d2, d3])
     return distance[len1-1][len2-1]
 
 class Person(object):
@@ -109,7 +113,7 @@ class Person(object):
                 dis += numpy.mean(comDisList)
             refDis.append(dis)
         templateIndex = refDis.index(min(refDis))
-        LOGGER.info("template index : %d" % templateIndex)
+        LOGGER.info("template index : %d. RefSigDisList: %s" % (templateIndex, refDis))
         self.templateSig = self.refSigs.pop(templateIndex)
         self.refCount -= 1
 
@@ -254,7 +258,7 @@ class Driver():
 
     def get_data(self):
         """
-        获取签名样本
+        Load original data from file
         """
         LOGGER.info("Getting signatures")
         signatures = []
@@ -294,7 +298,7 @@ class Driver():
         """
         return training_set & test_set
         """
-        trainCount = 30
+        trainCount = TRAINING_SET_COUNT
         return signatures[0:trainCount], signatures[trainCount:40]
 
     def test(self):
