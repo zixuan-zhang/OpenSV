@@ -1,6 +1,7 @@
 #coding: utf-8
 
 import os
+import time
 import logging
 import numpy
 import datetime
@@ -26,21 +27,26 @@ Singature Component:
 """
 
 # Signal list which need to be considered
-SigCompList = ["VY"]
+SigCompList = ["X"]
 #SigCompList = ["X", "Y", "VX", "VY"]
 PENALIZATION = {
-        "X": 5,
+        "X": 3,
         "Y": 5,
         "VX": 3,
         "VY": 3
         }
 THRESHOLD = {
-        "X": 2,
+        "X": 1,
         "Y": 2,
         "VX": 1,
         "VY": 1,
         }
-
+FEATURE_TYPE = {
+        "X": ["template", "max", "min"],
+        "Y": ["template", "max", "min"],
+        "VX": ["template", "max", "min"],
+        "VY": ["template", "max", "min"],
+        }
 METHOD = 2
 TRAINING_SET_COUNT = 20
 LOGGER.info("TrainingSetCount: %d" % TRAINING_SET_COUNT)
@@ -48,6 +54,7 @@ LOGGER.info("Method: %d" % METHOD)
 LOGGER.info("Signal List: %s" % SigCompList)
 LOGGER.info("PENALIZATION: %s" % PENALIZATION)
 LOGGER.info("THRESHOLD: %s" % THRESHOLD)
+LOGGER.info("FEATURE_TYPE: %s" % FEATURE_TYPE)
 
 def naive_dtw(A, B, p=5, t=5):
     penalization = p
@@ -84,12 +91,9 @@ class Person(object):
         self.refSigs = refSigs
         self.testSigs = testSigs
         self.refCount = len(refSigs)
-
         self.templateSig = None
-
         # select template signature
         self.select_template()
-
         # calculate base distance
         self.calc_base_dis()
 
@@ -140,11 +144,15 @@ class Person(object):
                     comDisList.append(naive_dtw(comi, comj))
                 maxComList.append(max(comDisList))
                 minComList.append(min(comDisList))
-            self.base["template" + com] = numpy.mean(templateComList)
-            self.base["max"+com] = numpy.mean(maxComList)
-            self.base["min"+com] = numpy.mean(minComList)
-            LOGGER.info("Calculating signal: %s, baseTemplate: %f, baseMax: %f, baseMin: %f" %
-                    (com, self.base["template"+com], self.base["max"+com], self.base["min"+com]))
+            if "template" in FEATURE_TYPE[com]:
+                self.base["template" + com] = numpy.mean(templateComList)
+            if "max" in FEATURE_TYPE[com]:
+                self.base["max"+com] = numpy.mean(maxComList)
+            if "min" in FEATURE_TYPE[com]:
+                self.base["min"+com] = numpy.mean(minComList)
+            # LOGGER.info("Calculating signal: %s, baseTemplate: %f, baseMax: %f, baseMin: %f" %
+                    # (com, self.base["template"+com], self.base["max"+com], self.base["min"+com]))
+            LOGGER.info("Calculating signal: %s. %s" % (com, ", ".join(["%s:%s"%(items[0], items[1]) for items in self.base.items()])))
 
     def calc_dis(self, signature):
         """
@@ -162,15 +170,17 @@ class Person(object):
                 comDisList.append(dis)
             maxComDis = max(comDisList)
             minComDis = min(comDisList)
-            featureVec.append(templateComDis / self.base["template"+com])
-            featureVec.append(maxComDis / self.base["max"+com])
-            featureVec.append(minComDis / self.base["min"+com])
+            if "template" in FEATURE_TYPE[com]:
+                featureVec.append(templateComDis / self.base["template"+com])
+            if "max" in FEATURE_TYPE[com]:
+                featureVec.append(maxComDis / self.base["max"+com])
+            if "min" in FEATURE_TYPE[com]:
+                featureVec.append(minComDis / self.base["min"+com])
         return featureVec
 
 class PersonTest(Person):
     def __init__(self, refSigs):
         super(PersonTest, self).__init__(refSigs, None)
-
 
 class PersonTraining(Person):
     def __init__(self, signatures):
@@ -183,7 +193,9 @@ class PersonTraining(Person):
         self.genuineSigs = self.testSigs[:12]
         self.forgerySigs = self.testSigs[12:]
 
-        LOGGER.info("Reference signature count: %d, test signature count: %d, genuine test signatures: %d, forgery test signatures: %d" % (self.refCount, len(self.testSigs), len(self.genuineSigs), len(self.forgerySigs)))
+        LOGGER.info("Reference signature count: %d, test signature count: %d, \
+                genuine test signatures: %d, forgery test signatures: %d" % \
+                (self.refCount, len(self.testSigs), len(self.genuineSigs), len(self.forgerySigs)))
 
     def calc_train_set(self):
         """
@@ -313,13 +325,13 @@ class Driver():
             for sig in genuine_set:
                 dis = personTest.calc_dis(sig)
                 res = self.svm.predict(dis)
-                LOGGER.info("Genuine Test: %s, Result: %s" % (dis, res))
+                LOGGER.info("Genuine Test: Result: %s, %s" % (res, dis))
                 genuine_test_result.append(res)
 
             for sig in forgery_set:
                 dis = personTest.calc_dis(sig)
                 res = self.svm.predict(dis)
-                LOGGER.info("Forgery Test: %s, Result: %s" % (dis, res))
+                LOGGER.info("Forgery Test: Result: %s, %s" % (dis, res))
                 forgery_test_result.append(res)
 
         LOGGER.info("genuine test set count: %d" % len(genuine_test_result))
@@ -331,8 +343,11 @@ class Driver():
         LOGGER.info("false accepted rate: %f" % (1 - sum(forgery_test_result) / float(len(forgery_test_result))))
 
 def test_DTW():
+    start = time.time()
     driver = Driver()
     driver.test()
+    end = time.time()
+    LOGGR.info("Total time : %s" % end - start)
 
 if __name__ == "__main__":
    test_DTW() 
