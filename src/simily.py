@@ -13,9 +13,10 @@ from sklearn.ensemble import RandomForestClassifier
 import utils
 import processor
 
-FILENAME = datetime.datetime.now().strftime("%Y%m%d%H%M.log")
+FOLDER = "../data/VX_only"
+FILENAME = datetime.datetime.now().strftime("%Y%m%d%H%M%S.log")
 FORMAT = '%(asctime)s %(levelname)s %(name)s %(message)s'
-logging.basicConfig(filename = "../data/%s" %FILENAME, level = logging.INFO, format = FORMAT)
+logging.basicConfig(filename = "%s/%s" % (FOLDER, FILENAME), level = logging.INFO, format = FORMAT)
 LOGGER = logging.getLogger()
 
 """
@@ -26,19 +27,20 @@ Singature Component:
     'VY': velocity of y axis
 """
 
+METHOD = 2
 # Signal list which need to be considered
-SigCompList = ["X"]
+SigCompList = ["VX"]
 #SigCompList = ["X", "Y", "VX", "VY"]
 PENALIZATION = {
-        "X": 3,
-        "Y": 5,
-        "VX": 3,
+        "X": 10,
+        "Y": 7,
+        "VX": 2,
         "VY": 3
         }
 THRESHOLD = {
         "X": 1,
         "Y": 2,
-        "VX": 1,
+        "VX": 3,
         "VY": 1,
         }
 FEATURE_TYPE = {
@@ -47,7 +49,6 @@ FEATURE_TYPE = {
         "VX": ["template", "max", "min"],
         "VY": ["template", "max", "min"],
         }
-METHOD = 2
 TRAINING_SET_COUNT = 20
 LOGGER.info("TrainingSetCount: %d" % TRAINING_SET_COUNT)
 LOGGER.info("Method: %d" % METHOD)
@@ -314,10 +315,13 @@ class Driver():
         return signatures[0:trainCount], signatures[trainCount:40]
 
     def test(self):
+        LOGGER.info("Start test")
+        count = 1
         test_set = self.test_set
         forgery_test_result = []
         genuine_test_result = []
         for one_test_set in test_set:
+            LOGGER.info("Test signature: %d" % count)
             personTest = PersonTest(one_test_set[0:8])
             genuine_set = one_test_set[8:20]
             forgery_set = one_test_set[20:40]
