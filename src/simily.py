@@ -322,6 +322,7 @@ class Driver():
         genuine_test_result = []
         for one_test_set in test_set:
             LOGGER.info("Test signature: %d" % count)
+            count += 1
             personTest = PersonTest(one_test_set[0:8])
             genuine_set = one_test_set[8:20]
             forgery_set = one_test_set[20:40]
