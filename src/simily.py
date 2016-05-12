@@ -13,7 +13,7 @@ from sklearn.ensemble import RandomForestClassifier
 import utils
 import processor
 
-FOLDER = "../data/VX_only"
+FOLDER = "../data"
 FILENAME = datetime.datetime.now().strftime("%Y%m%d%H%M%S.log")
 FORMAT = '%(asctime)s %(levelname)s %(name)s %(message)s'
 logging.basicConfig(filename = "%s/%s" % (FOLDER, FILENAME), level = logging.INFO, format = FORMAT)
@@ -29,33 +29,42 @@ Singature Component:
 
 METHOD = 2
 # Signal list which need to be considered
-SigCompList = ["VX"]
+SigCompList = ["Y", "VX", "VY"]
 #SigCompList = ["X", "Y", "VX", "VY"]
 PENALIZATION = {
-        "X": 10,
+        "X": 7,
         "Y": 7,
-        "VX": 2,
-        "VY": 3
+        "VX": 6,
+        "VY": 6,
         }
 THRESHOLD = {
-        "X": 1,
+        "X": 2,
         "Y": 2,
-        "VX": 3,
-        "VY": 1,
+        "VX": 2,
+        "VY": 0,
         }
 FEATURE_TYPE = {
         "X": ["template", "max", "min"],
         "Y": ["template", "max", "min"],
-        "VX": ["template", "max", "min"],
-        "VY": ["template", "max", "min"],
+        "VX": ["template","max", "min"],
+        "VY": ["template","max", "min"],
         }
 TRAINING_SET_COUNT = 20
+
+# Random Forest Tree settings
+# MAX_FEATURES = None
+# N_ESTIMATORS = 50
+# MIN_SAMPLES_LEAF = 1
+# N_JOBS = 2 
+
 LOGGER.info("TrainingSetCount: %d" % TRAINING_SET_COUNT)
 LOGGER.info("Method: %d" % METHOD)
 LOGGER.info("Signal List: %s" % SigCompList)
 LOGGER.info("PENALIZATION: %s" % PENALIZATION)
 LOGGER.info("THRESHOLD: %s" % THRESHOLD)
 LOGGER.info("FEATURE_TYPE: %s" % FEATURE_TYPE)
+# LOGGER.info("RandomForestTree: max_feature: %s, n_estimator: %d, min_sample_leaf: %d, n_jobs: %d" %
+        # (MAX_FEATURES, N_ESTIMATORS, MIN_SAMPLES_LEAF, N_JOBS))
 
 def naive_dtw(A, B, p=5, t=5):
     penalization = p
@@ -133,6 +142,7 @@ class Person(object):
             templateComList = []
             maxComList = []
             minComList = []
+            avgComList = []
             for i in range(self.refCount):
                 comi = self.refSigs[i][com]
                 templateComDis = naive_dtw(comi, self.templateSig[com], PENALIZATION[com], THRESHOLD[com])
@@ -145,12 +155,16 @@ class Person(object):
                     comDisList.append(naive_dtw(comi, comj))
                 maxComList.append(max(comDisList))
                 minComList.append(min(comDisList))
+                avgComList.append(numpy.mean(comDisList))
             if "template" in FEATURE_TYPE[com]:
                 self.base["template" + com] = numpy.mean(templateComList)
             if "max" in FEATURE_TYPE[com]:
                 self.base["max"+com] = numpy.mean(maxComList)
             if "min" in FEATURE_TYPE[com]:
                 self.base["min"+com] = numpy.mean(minComList)
+            if "avg" in FEATURE_TYPE[com]:
+                self.base["avg"+com] = numpy.mean(avgComList)
+
             # LOGGER.info("Calculating signal: %s, baseTemplate: %f, baseMax: %f, baseMin: %f" %
                     # (com, self.base["template"+com], self.base["max"+com], self.base["min"+com]))
             LOGGER.info("Calculating signal: %s. %s" % (com, ", ".join(["%s:%s"%(items[0], items[1]) for items in self.base.items()])))
@@ -171,12 +185,15 @@ class Person(object):
                 comDisList.append(dis)
             maxComDis = max(comDisList)
             minComDis = min(comDisList)
+            avgComDis = numpy.mean(comDisList)
             if "template" in FEATURE_TYPE[com]:
                 featureVec.append(templateComDis / self.base["template"+com])
             if "max" in FEATURE_TYPE[com]:
                 featureVec.append(maxComDis / self.base["max"+com])
             if "min" in FEATURE_TYPE[com]:
                 featureVec.append(minComDis / self.base["min"+com])
+            if "avg" in FEATURE_TYPE[com]:
+                featureVec.append(avgComDis / self.base["avg"+com])
         return featureVec
 
 class PersonTest(Person):
@@ -230,6 +247,8 @@ class Driver():
 
         # self.svm = svm.SVC()
         # self.svm = tree.DecisionTreeClassifier()
+        # self.svm = RandomForestClassifier(n_estimators=N_ESTIMATORS, n_jobs=N_JOBS,
+                # max_features = MAX_FEATURES, min_samples_leaf = MIN_SAMPLES_LEAF)
         self.svm = RandomForestClassifier(n_estimators=50)
 
         genuineX = []
@@ -352,7 +371,7 @@ def test_DTW():
     driver = Driver()
     driver.test()
     end = time.time()
-    LOGGR.info("Total time : %s" % end - start)
+    LOGGER.info("Total time : %s" % end - start)
 
 if __name__ == "__main__":
    test_DTW() 
