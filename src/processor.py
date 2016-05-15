@@ -42,6 +42,18 @@ class PreProcessor(object):
         resultY = [y - meanY for y in Y]
         return resultX, resultY
 
+    def offset_to_origin_normalization(self, X, Y):
+        """
+            使坐标为原始坐标的offset
+        """
+        if len(X) == 0:
+            return X, Y
+        x0 = X[0]
+        y0 = Y[0]
+        XR = [xi - x0 for xi in X]
+        YR = [yi - y0 for yi in Y]
+        return XR, YR
+
     def size_normalization(self, X, Y, width, height):
         """
             轨迹大小归一化

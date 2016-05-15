@@ -9,6 +9,7 @@ import datetime
 from sklearn import svm
 from sklearn import tree
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import GradientBoostingClassifier
 
 import utils
 import processor
@@ -27,10 +28,9 @@ Singature Component:
     'VY': velocity of y axis
 """
 
-METHOD = 2
+METHOD = 1
 # Signal list which need to be considered
 SigCompList = ["Y", "VX", "VY"]
-#SigCompList = ["X", "Y", "VX", "VY"]
 PENALIZATION = {
         "X": 7,
         "Y": 7,
@@ -44,27 +44,34 @@ THRESHOLD = {
         "VY": 0,
         }
 FEATURE_TYPE = {
-        "X": ["template", "max", "min"],
-        "Y": ["template", "max", "min"],
-        "VX": ["template","max", "min"],
-        "VY": ["template","max", "min"],
+        "X": ["template", "max", "min", "avg"],
+        "Y": ["template", "max", "min", "avg"],
+        "VX": ["template", "max", "min", "avg"],
+        "VY": ["template", "max", "min", "avg"],
         }
 TRAINING_SET_COUNT = 20
+REF_COUNT = 8
+CLASSIFIER = "GBC" # "RFC", "GBC", "SVM"
 
 # Random Forest Tree settings
-# MAX_FEATURES = None
-# N_ESTIMATORS = 50
-# MIN_SAMPLES_LEAF = 1
-# N_JOBS = 2 
+MAX_FEATURES = None
+N_ESTIMATORS = 200
+MIN_SAMPLES_LEAF = 1
+N_JOBS = 1
 
+LOCAL_NORMAL_TYPE = "mid" # "mid" or "offset"
+
+LOGGER.info("ClassifierType: %s" % CLASSIFIER)
+LOGGER.info("LocalNormalizationType: %s" % LOCAL_NORMAL_TYPE)
 LOGGER.info("TrainingSetCount: %d" % TRAINING_SET_COUNT)
+LOGGER.info("Reference Count: %d" % REF_COUNT)
 LOGGER.info("Method: %d" % METHOD)
 LOGGER.info("Signal List: %s" % SigCompList)
 LOGGER.info("PENALIZATION: %s" % PENALIZATION)
 LOGGER.info("THRESHOLD: %s" % THRESHOLD)
 LOGGER.info("FEATURE_TYPE: %s" % FEATURE_TYPE)
-# LOGGER.info("RandomForestTree: max_feature: %s, n_estimator: %d, min_sample_leaf: %d, n_jobs: %d" %
-        # (MAX_FEATURES, N_ESTIMATORS, MIN_SAMPLES_LEAF, N_JOBS))
+LOGGER.info("RandomForestTree: max_feature: %s, n_estimator: %d, min_sample_leaf: %d, n_jobs: %d" %
+        (MAX_FEATURES, N_ESTIMATORS, MIN_SAMPLES_LEAF, N_JOBS))
 
 def naive_dtw(A, B, p=5, t=5):
     penalization = p
@@ -206,10 +213,10 @@ class PersonTraining(Person):
         suppose 40 signatures: 20 genuine & 20 forgeries
         """
         # eight reference signatures
-        super(PersonTraining, self).__init__(signatures[0:8], signatures[8:])
+        super(PersonTraining, self).__init__(signatures[0:REF_COUNT], signatures[REF_COUNT:])
         
-        self.genuineSigs = self.testSigs[:12]
-        self.forgerySigs = self.testSigs[12:]
+        self.genuineSigs = self.testSigs[:20-REF_COUNT]
+        self.forgerySigs = self.testSigs[20-REF_COUNT:]
 
         LOGGER.info("Reference signature count: %d, test signature count: %d, \
                 genuine test signatures: %d, forgery test signatures: %d" % \
@@ -249,7 +256,12 @@ class Driver():
         # self.svm = tree.DecisionTreeClassifier()
         # self.svm = RandomForestClassifier(n_estimators=N_ESTIMATORS, n_jobs=N_JOBS,
                 # max_features = MAX_FEATURES, min_samples_leaf = MIN_SAMPLES_LEAF)
-        self.svm = RandomForestClassifier(n_estimators=50)
+        # self.svm = RandomForestClassifier(n_estimators=N_ESTIMATORS, n_jobs=N_JOBS)
+        # self.svm = GradientBoostingClassifier(n_estimators=100)
+        if CLASSIFIER == "SVM":
+            self.svm = svm.SVC()
+        elif CLASSIFIER == "GBC":
+            self.svm = GradientBoostingClassifier(n_estimators=300, max_depth=5, learning_rate=0.05)
 
         genuineX = []
         forgeryX = []
@@ -283,7 +295,10 @@ class Driver():
                 X = signatures[uid][sid][0]
                 Y = signatures[uid][sid][1]
                 RX, RY = self.processor.size_normalization(X, Y, 400, 200)
-                RX, RY = self.processor.location_normalization(RX, RY)
+                if LOCAL_NORMAL_TYPE == "mid":
+                    RX, RY = self.processor.location_normalization(RX, RY)
+                elif LOCAL_NORMAL_TYPE == "offset":
+                    RX, RY = self.processor.offset_to_origin_normalization(RX, RY)
                 uSigs.append([RX, RY])
             result.append(uSigs)
         return result
@@ -342,8 +357,8 @@ class Driver():
         for one_test_set in test_set:
             LOGGER.info("Test signature: %d" % count)
             count += 1
-            personTest = PersonTest(one_test_set[0:8])
-            genuine_set = one_test_set[8:20]
+            personTest = PersonTest(one_test_set[0:REF_COUNT])
+            genuine_set = one_test_set[REF_COUNT:20]
             forgery_set = one_test_set[20:40]
 
             for sig in genuine_set:
