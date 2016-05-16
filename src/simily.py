@@ -28,7 +28,7 @@ Singature Component:
     'VY': velocity of y axis
 """
 
-METHOD = 1
+METHOD = 2
 # Signal list which need to be considered
 SigCompList = ["Y", "VX", "VY"]
 PENALIZATION = {
@@ -44,18 +44,19 @@ THRESHOLD = {
         "VY": 0,
         }
 FEATURE_TYPE = {
-        "X": ["template", "max", "min", "avg"],
-        "Y": ["template", "max", "min", "avg"],
-        "VX": ["template", "max", "min", "avg"],
-        "VY": ["template", "max", "min", "avg"],
+        "X": ["template", "min", "avg"],
+        "Y": ["template", "min", "avg"],
+        "VX": ["template","min", "avg"],
+        "VY": ["template","min", "avg"],
         }
 TRAINING_SET_COUNT = 20
 REF_COUNT = 8
-CLASSIFIER = "GBC" # "RFC", "GBC", "SVM"
+CLASSIFIER = "RFC" # "RFC", "GBC", "SVM"
 
 # Random Forest Tree settings
+MAX_DEPTH = 3
 MAX_FEATURES = None
-N_ESTIMATORS = 200
+N_ESTIMATORS = 300
 MIN_SAMPLES_LEAF = 1
 N_JOBS = 1
 
@@ -70,8 +71,8 @@ LOGGER.info("Signal List: %s" % SigCompList)
 LOGGER.info("PENALIZATION: %s" % PENALIZATION)
 LOGGER.info("THRESHOLD: %s" % THRESHOLD)
 LOGGER.info("FEATURE_TYPE: %s" % FEATURE_TYPE)
-LOGGER.info("RandomForestTree: max_feature: %s, n_estimator: %d, min_sample_leaf: %d, n_jobs: %d" %
-        (MAX_FEATURES, N_ESTIMATORS, MIN_SAMPLES_LEAF, N_JOBS))
+LOGGER.info("RandomForestTree: max_feature: %s, n_estimator: %d, min_sample_leaf: %d, n_jobs: %d, max_depth: %d" %
+        (MAX_FEATURES, N_ESTIMATORS, MIN_SAMPLES_LEAF, N_JOBS, MAX_DEPTH))
 
 def naive_dtw(A, B, p=5, t=5):
     penalization = p
@@ -262,6 +263,10 @@ class Driver():
             self.svm = svm.SVC()
         elif CLASSIFIER == "GBC":
             self.svm = GradientBoostingClassifier(n_estimators=300, max_depth=5, learning_rate=0.05)
+        elif CLASSIFIER == "RFC":
+            # self.svm = RandomForestClassifier(n_estimators=N_ESTIMATORS, n_jobs=N_JOBS,
+                # max_features = MAX_FEATURES, min_samples_leaf = MIN_SAMPLES_LEAF, max_depth=MAX_DEPTH)
+            self.svm = RandomForestClassifier(n_estimators=N_ESTIMATORS, n_jobs=N_JOBS)
 
         genuineX = []
         forgeryX = []
@@ -292,9 +297,9 @@ class Driver():
         for uid in range(40):
             uSigs = []
             for sid in range(40):
-                X = signatures[uid][sid][0]
-                Y = signatures[uid][sid][1]
-                RX, RY = self.processor.size_normalization(X, Y, 400, 200)
+                RX = signatures[uid][sid][0]
+                RY = signatures[uid][sid][1]
+                RX, RY = self.processor.size_normalization(RX, RY, 400, 200)
                 if LOCAL_NORMAL_TYPE == "mid":
                     RX, RY = self.processor.location_normalization(RX, RY)
                 elif LOCAL_NORMAL_TYPE == "offset":
