@@ -36,18 +36,24 @@ PENALIZATION = {
         "Y": 7,
         "VX": 6,
         "VY": 6,
+        "P": 7,
+        "VP": 2,
         }
 THRESHOLD = {
         "X": 2,
         "Y": 2,
         "VX": 2,
         "VY": 0,
+        "P": 3,
+        "VP": 0,
         }
 FEATURE_TYPE = {
         "X": ["template", "min", "avg"],
         "Y": ["template", "min", "avg"],
         "VX": ["template","min", "avg"],
         "VY": ["template","min", "avg"],
+        "P": ["template", "min", "avg"],
+        "VP": ["template", "min", "avg"]
         }
 TRAINING_SET_COUNT = 20
 REF_COUNT = 8
@@ -56,12 +62,14 @@ CLASSIFIER = "RFC" # "RFC", "GBC", "SVM"
 # Random Forest Tree settings
 MAX_DEPTH = 3
 MAX_FEATURES = None
-N_ESTIMATORS = 300
+N_ESTIMATORS = 200
 MIN_SAMPLES_LEAF = 1
 N_JOBS = 1
 
 LOCAL_NORMAL_TYPE = "mid" # "mid" or "offset"
+RANDOM_FORGERY_INCLUDE = True
 
+LOGGER.info("RandomForgeryInclude: %s" % RANDOM_FORGERY_INCLUDE)
 LOGGER.info("ClassifierType: %s" % CLASSIFIER)
 LOGGER.info("LocalNormalizationType: %s" % LOCAL_NORMAL_TYPE)
 LOGGER.info("TrainingSetCount: %d" % TRAINING_SET_COUNT)
@@ -299,12 +307,13 @@ class Driver():
             for sid in range(40):
                 RX = signatures[uid][sid][0]
                 RY = signatures[uid][sid][1]
+                P = signatures[uid][sid][2]
                 RX, RY = self.processor.size_normalization(RX, RY, 400, 200)
                 if LOCAL_NORMAL_TYPE == "mid":
                     RX, RY = self.processor.location_normalization(RX, RY)
                 elif LOCAL_NORMAL_TYPE == "offset":
                     RX, RY = self.processor.offset_to_origin_normalization(RX, RY)
-                uSigs.append([RX, RY])
+                uSigs.append([RX, RY, P])
             result.append(uSigs)
         return result
 
@@ -321,7 +330,7 @@ class Driver():
                 fileName = "U%dS%d.TXT" % (uid, sig)
                 filePath = os.path.join(dataPath, fileName)
                 X, Y, T, P = utils.get_data_from_file(filePath)
-                personSigs.append([X, Y])
+                personSigs.append([X, Y, P])
             signatures.append(personSigs)
         return signatures
 
@@ -336,9 +345,11 @@ class Driver():
                 signature = signatures[uid][sid]
                 X = signature[0]
                 Y = signature[1]
+                P = signature[2]
                 VX = self.calculate_delta(X)
                 VY = self.calculate_delta(Y)
-                uSigs.append({"X": X, "Y": Y, "VX": VX, "VY": VY})
+                VP = self.calculate_delta(P)
+                uSigs.append({"X": X, "Y": Y, "P": P, "VX": VX, "VY": VY, "VP": VP})
             reconstructedSigs.append(uSigs)
         return reconstructedSigs
 
@@ -359,24 +370,51 @@ class Driver():
         test_set = self.test_set
         forgery_test_result = []
         genuine_test_result = []
-        for one_test_set in test_set:
+        random_test_result = []
+        for i in range(len(test_set)):
+            one_test_set = test_set[i]
             LOGGER.info("Test signature: %d" % count)
             count += 1
             personTest = PersonTest(one_test_set[0:REF_COUNT])
             genuine_set = one_test_set[REF_COUNT:20]
             forgery_set = one_test_set[20:40]
+            random_set = []
 
-            for sig in genuine_set:
+            for j in range(len(genuine_set)):
+                sig = genuine_set[j]
                 dis = personTest.calc_dis(sig)
                 res = self.svm.predict(dis)
                 LOGGER.info("Genuine Test: Result: %s, %s" % (res, dis))
                 genuine_test_result.append(res)
+                if (res != 1):
+                    LOGGER.fatal("FalseReject: uid: %d, sid: %d" % (i, j))
 
-            for sig in forgery_set:
+            for j in range(len(forgery_set)):
+                sig = forgery_set[j]
                 dis = personTest.calc_dis(sig)
                 res = self.svm.predict(dis)
                 LOGGER.info("Forgery Test: Result: %s, %s" % (dis, res))
                 forgery_test_result.append(res)
+                if (res != 0):
+                    LOGGER.fatal("FalseAccept: uid: %d, sid: %d" % (i, j))
+
+            if RANDOM_FORGERY_INCLUDE:
+                for j in range(len(test_set)):
+                    if i == j:
+                        continue
+                    random_set.extend(test_set[j])
+                # train set included
+                for one_train_set in self.train_set:
+                    random_set.extend(one_train_set)
+
+                for j in range(len(random_set)):
+                    sig = random_set[j]
+                    dis = personTest.calc_dis(sig)
+                    res = self.svm.predict(dis)
+                    LOGGER.info("Random Test: Result: %s, %s" % (res, dis))
+                    random_test_result.append(res)
+                    if (res != 0):
+                        LOGGER.fatal("FalseAccept: uid: %d, sig: %d" % (i, j))
 
         LOGGER.info("genuine test set count: %d" % len(genuine_test_result))
         LOGGER.info("true accepted count: %d" % sum(genuine_test_result))
@@ -386,12 +424,17 @@ class Driver():
         LOGGER.info("false accepted count: %d" % sum(forgery_test_result))
         LOGGER.info("false accepted rate: %f" % (1 - sum(forgery_test_result) / float(len(forgery_test_result))))
 
+        if RANDOM_FORGERY_INCLUDE:
+            LOGGER.info("random test set count: %d" % len(random_test_result))
+            LOGGER.info("false accepted count: %d" % sum(random_test_result))
+            LOGGER.info("false accepted rate: %f" % (1 - sum(random_test_result) / float(len(random_test_result))))
+
 def test_DTW():
     start = time.time()
     driver = Driver()
     driver.test()
     end = time.time()
-    LOGGER.info("Total time : %s" % end - start)
+    LOGGER.info("Total time : %f" % end - start)
 
 if __name__ == "__main__":
    test_DTW() 
