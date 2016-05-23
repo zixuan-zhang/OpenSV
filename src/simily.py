@@ -10,6 +10,7 @@ from sklearn import svm
 from sklearn import tree
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.ensemble import GradientBoostingClassifier
+from sklearn.neural_network import MLPClassifier
 
 import utils
 import processor
@@ -56,8 +57,8 @@ FEATURE_TYPE = {
         "VP": ["template", "min", "avg"]
         }
 TRAINING_SET_COUNT = 20
-REF_COUNT = 8
-CLASSIFIER = "RFC" # "RFC", "GBC", "SVM"
+REF_COUNT = 9
+CLASSIFIER = "MLP" # "RFC", "GBC", "SVM", "MLP"
 
 # Random Forest Tree settings
 MAX_DEPTH = 3
@@ -67,8 +68,10 @@ MIN_SAMPLES_LEAF = 1
 N_JOBS = 1
 
 LOCAL_NORMAL_TYPE = "mid" # "mid" or "offset"
-RANDOM_FORGERY_INCLUDE = True
+RANDOM_FORGERY_INCLUDE = False
+SIZE_NORM_SWITCH = True
 
+LOGGER.info("SizeNormalizationSwitch: %s" % SIZE_NORM_SWITCH)
 LOGGER.info("RandomForgeryInclude: %s" % RANDOM_FORGERY_INCLUDE)
 LOGGER.info("ClassifierType: %s" % CLASSIFIER)
 LOGGER.info("LocalNormalizationType: %s" % LOCAL_NORMAL_TYPE)
@@ -275,6 +278,8 @@ class Driver():
             # self.svm = RandomForestClassifier(n_estimators=N_ESTIMATORS, n_jobs=N_JOBS,
                 # max_features = MAX_FEATURES, min_samples_leaf = MIN_SAMPLES_LEAF, max_depth=MAX_DEPTH)
             self.svm = RandomForestClassifier(n_estimators=N_ESTIMATORS, n_jobs=N_JOBS)
+        elif CLASSIFIER == "MLP":
+            self.svm = MLPClassifier()
 
         genuineX = []
         forgeryX = []
@@ -308,7 +313,8 @@ class Driver():
                 RX = signatures[uid][sid][0]
                 RY = signatures[uid][sid][1]
                 P = signatures[uid][sid][2]
-                RX, RY = self.processor.size_normalization(RX, RY, 400, 200)
+                if SIZE_NORM_SWITCH:
+                    RX, RY = self.processor.size_normalization(RX, RY, 400, 200)
                 if LOCAL_NORMAL_TYPE == "mid":
                     RX, RY = self.processor.location_normalization(RX, RY)
                 elif LOCAL_NORMAL_TYPE == "offset":
