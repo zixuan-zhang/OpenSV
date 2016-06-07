@@ -33,7 +33,7 @@ Singature Component:
 
 METHOD = 1
 # Signal list which need to be considered
-SigCompList = ["AY"]
+SigCompList = ["Y", "VX", "VY"]
 PENALIZATION = {
         "X": 7,
         "Y": 7,
@@ -64,6 +64,9 @@ FEATURE_TYPE = {
         "AX": ["template", "min", "avg"],
         "AY": ["template", "min", "avg"],
         }
+PERSON_COUNT = 40
+SIG_COUNT = 40
+GENUINE_COUNT = 20
 TRAINING_SET_COUNT = 20
 REF_COUNT = 8
 CLASSIFIER = "RFC" # "RFC", "GBC", "SVM", "MLP"
@@ -131,8 +134,9 @@ def naive_dtw(A, B, p=5, t=5):
 
 class Person(object):
 
-    def __init__(self, refSigs, testSigs):
+    def __init__(self, refSigs, testSigs, key = None):
 
+        self.key = key
         self.refSigs = refSigs
         self.testSigs = testSigs
         self.refCount = len(refSigs)
@@ -235,13 +239,12 @@ class PersonTest(Person):
 class PersonTraining(Person):
     def __init__(self, signatures):
         """
-        suppose 40 signatures: 20 genuine & 20 forgeries
         """
         # eight reference signatures
         super(PersonTraining, self).__init__(signatures[0:REF_COUNT], signatures[REF_COUNT:])
         
-        self.genuineSigs = self.testSigs[:20-REF_COUNT]
-        self.forgerySigs = self.testSigs[20-REF_COUNT:]
+        self.genuineSigs = self.testSigs[:GENUINE_COUNT-REF_COUNT]
+        self.forgerySigs = self.testSigs[GENUINE_COUNT-REF_COUNT:]
 
         LOGGER.info("Reference signature count: %d, test signature count: %d, \
                 genuine test signatures: %d, forgery test signatures: %d" % \
@@ -269,19 +272,13 @@ class PersonTraining(Person):
 
 class Driver():
     def __init__(self):
-        signatures = self.get_data()
+        signatures = self.get_data_from_task2()
         signatures = self.pre_process(signatures)
         LOGGER.info("Total signatures: %d" % len(signatures))
         signatures = self.reconstructSignatures(signatures)
         self.train_set, self.test_set = self.train_test_split(signatures)
         LOGGER.info("Spliting value set, training_set %d, test_set %d" % (len(self.train_set), len(self.test_set)))
 
-        # self.svm = svm.SVC()
-        # self.svm = tree.DecisionTreeClassifier()
-        # self.svm = RandomForestClassifier(n_estimators=N_ESTIMATORS, n_jobs=N_JOBS,
-                # max_features = MAX_FEATURES, min_samples_leaf = MIN_SAMPLES_LEAF)
-        # self.svm = RandomForestClassifier(n_estimators=N_ESTIMATORS, n_jobs=N_JOBS)
-        # self.svm = GradientBoostingClassifier(n_estimators=100)
         if CLASSIFIER == "SVM":
             self.svm = svm.SVC()
         elif CLASSIFIER == "GBC":
@@ -317,9 +314,9 @@ class Driver():
         """
         self.processor = processor.PreProcessor()
         result = []
-        for uid in range(40):
+        for uid in range(PERSON_COUNT):
             uSigs = []
-            for sid in range(40):
+            for sid in range(SIG_COUNT):
                 RX = signatures[uid][sid][0]
                 RY = signatures[uid][sid][1]
                 P = signatures[uid][sid][2]
@@ -333,9 +330,9 @@ class Driver():
             result.append(uSigs)
         return result
 
-    def get_data(self):
+    def get_data_from_task2(self):
         """
-        Load original data from file
+        Load original data from svc2004 task2
         """
         LOGGER.info("Getting signatures")
         signatures = []
@@ -350,14 +347,19 @@ class Driver():
             signatures.append(personSigs)
         return signatures
 
+    def get_data_from_susig(self):
+        """
+        Load original data from susig
+        """
+
     def reconstructSignatures(self, signatures):
         """
         Reconstruct signatures to dictionary like object.
         """
         reconstructedSigs = []
-        for uid in range(40):
+        for uid in range(PERSON_COUNT):
             uSigs = []
-            for sid in range(40):
+            for sid in range(SIG_COUNT):
                 signature = signatures[uid][sid]
                 X = signature[0]
                 Y = signature[1]
@@ -380,7 +382,7 @@ class Driver():
         return training_set & test_set
         """
         trainCount = TRAINING_SET_COUNT
-        return signatures[0:trainCount], signatures[trainCount:40]
+        return signatures[0:trainCount], signatures[trainCount:PERSON_COUNT]
 
     def test(self):
         LOGGER.info("Start test")
@@ -396,8 +398,8 @@ class Driver():
             LOGGER.info("Test signature: %d" % count)
             count += 1
             personTest = PersonTest(one_test_set[0:REF_COUNT])
-            genuine_set = one_test_set[REF_COUNT:20]
-            forgery_set = one_test_set[20:40]
+            genuine_set = one_test_set[REF_COUNT:GENUINE_COUNT]
+            forgery_set = one_test_set[GENUINE_COUNT:PERSON_COUNT]
             random_set = []
 
             for j in range(len(genuine_set)):
