@@ -10,7 +10,6 @@ from sklearn import svm
 from sklearn import tree
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.ensemble import GradientBoostingClassifier
-from sklearn.neural_network import MLPClassifier
 
 import utils
 import processor
@@ -25,13 +24,16 @@ LOGGER = logging.getLogger()
 Singature Component:
     'X': x axis
     'Y': y axis
+    'P': pressure
     'VX': velocity of x axis
     'VY': velocity of y axis
+    'AX': acceleration of x axis
+    'AY': acceleration of y axis
 """
 
-METHOD = 2
+METHOD = 1
 # Signal list which need to be considered
-SigCompList = ["Y", "VX", "VY"]
+SigCompList = ["AY"]
 PENALIZATION = {
         "X": 7,
         "Y": 7,
@@ -39,6 +41,8 @@ PENALIZATION = {
         "VY": 6,
         "P": 7,
         "VP": 2,
+        "AX": 7,
+        "AY": 7,
         }
 THRESHOLD = {
         "X": 2,
@@ -47,6 +51,8 @@ THRESHOLD = {
         "VY": 0,
         "P": 3,
         "VP": 0,
+        "AX": 1,
+        "AY": 1,
         }
 FEATURE_TYPE = {
         "X": ["template", "min", "avg"],
@@ -54,11 +60,13 @@ FEATURE_TYPE = {
         "VX": ["template","min", "avg"],
         "VY": ["template","min", "avg"],
         "P": ["template", "min", "avg"],
-        "VP": ["template", "min", "avg"]
+        "VP": ["template", "min", "avg"],
+        "AX": ["template", "min", "avg"],
+        "AY": ["template", "min", "avg"],
         }
 TRAINING_SET_COUNT = 20
-REF_COUNT = 9
-CLASSIFIER = "MLP" # "RFC", "GBC", "SVM", "MLP"
+REF_COUNT = 8
+CLASSIFIER = "RFC" # "RFC", "GBC", "SVM", "MLP"
 
 # Random Forest Tree settings
 MAX_DEPTH = 3
@@ -69,6 +77,7 @@ N_JOBS = 1
 
 LOCAL_NORMAL_TYPE = "mid" # "mid" or "offset"
 RANDOM_FORGERY_INCLUDE = False
+TRAIN_SET_INCLUDE = False
 SIZE_NORM_SWITCH = True
 
 LOGGER.info("SizeNormalizationSwitch: %s" % SIZE_NORM_SWITCH)
@@ -111,6 +120,13 @@ def naive_dtw(A, B, p=5, t=5):
                 other = 0 if (abs(A[i] - B[j]) < threshold) else (abs(A[i] - B[j]) - threshold)
                 d3 = distance[i-1][j-1] + other
                 distance[i][j] = min([d1, d2, d3])
+            elif METHOD == 3:
+                d1 = distance[i-1][j] + abs(A[i] - B[j])
+                d2 = distance[i][j-1] + abs(A[i] - B[j])
+                other = 0 if (abs(A[i] - B[j]) < threshold) else (abs(A[i] - B[j]) - threshold)
+                d3 = distance[i-1][j-1] + other
+                distance[i][j] = min([d1, d2, d3])
+                
     return distance[len1-1][len2-1]
 
 class Person(object):
@@ -183,9 +199,6 @@ class Person(object):
                 self.base["min"+com] = numpy.mean(minComList)
             if "avg" in FEATURE_TYPE[com]:
                 self.base["avg"+com] = numpy.mean(avgComList)
-
-            # LOGGER.info("Calculating signal: %s, baseTemplate: %f, baseMax: %f, baseMin: %f" %
-                    # (com, self.base["template"+com], self.base["max"+com], self.base["min"+com]))
             LOGGER.info("Calculating signal: %s. %s" % (com, ", ".join(["%s:%s"%(items[0], items[1]) for items in self.base.items()])))
 
     def calc_dis(self, signature):
@@ -256,7 +269,6 @@ class PersonTraining(Person):
 
 class Driver():
     def __init__(self):
-
         signatures = self.get_data()
         signatures = self.pre_process(signatures)
         LOGGER.info("Total signatures: %d" % len(signatures))
@@ -278,8 +290,6 @@ class Driver():
             # self.svm = RandomForestClassifier(n_estimators=N_ESTIMATORS, n_jobs=N_JOBS,
                 # max_features = MAX_FEATURES, min_samples_leaf = MIN_SAMPLES_LEAF, max_depth=MAX_DEPTH)
             self.svm = RandomForestClassifier(n_estimators=N_ESTIMATORS, n_jobs=N_JOBS)
-        elif CLASSIFIER == "MLP":
-            self.svm = MLPClassifier()
 
         genuineX = []
         forgeryX = []
@@ -355,7 +365,9 @@ class Driver():
                 VX = self.calculate_delta(X)
                 VY = self.calculate_delta(Y)
                 VP = self.calculate_delta(P)
-                uSigs.append({"X": X, "Y": Y, "P": P, "VX": VX, "VY": VY, "VP": VP})
+                AX = self.calculate_delta(VX)
+                AY = self.calculate_delta(VY)
+                uSigs.append({"X": X, "Y": Y, "P": P, "VX": VX, "VY": VY, "VP": VP, "AX": AX, "AY": AY})
             reconstructedSigs.append(uSigs)
         return reconstructedSigs
 
@@ -374,6 +386,8 @@ class Driver():
         LOGGER.info("Start test")
         count = 1
         test_set = self.test_set
+        if TRAIN_SET_INCLUDE:
+            test_set.extend(self.train_set)
         forgery_test_result = []
         genuine_test_result = []
         random_test_result = []
@@ -440,7 +454,7 @@ def test_DTW():
     driver = Driver()
     driver.test()
     end = time.time()
-    LOGGER.info("Total time : %f" % end - start)
+    LOGGER.info("Total time : %f" % (end - start))
 
 if __name__ == "__main__":
    test_DTW() 
