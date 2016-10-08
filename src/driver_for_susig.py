@@ -14,7 +14,7 @@ from sklearn.ensemble import GradientBoostingClassifier
 import utils
 import processor
 
-FOLDER = "../data"
+FOLDER = "../data/susig_log"
 FILENAME = datetime.datetime.now().strftime("%Y%m%d%H%M%S.log")
 FORMAT = '%(asctime)s %(levelname)s %(name)s %(message)s'
 logging.basicConfig(filename = "%s/%s" % (FOLDER, FILENAME), level = logging.INFO, format = FORMAT)
@@ -30,10 +30,11 @@ Singature Component:
     'AX': acceleration of x axis
     'AY': acceleration of y axis
 """
-
-METHOD = 1
 # Signal list which need to be considered
 SigCompList = ["Y", "VX", "VY"]
+
+# DTW settings
+METHOD = 2
 PENALIZATION = {
         "X": 7,
         "Y": 7,
@@ -54,6 +55,8 @@ THRESHOLD = {
         "AX": 1,
         "AY": 1,
         }
+
+# Feature settings
 FEATURE_TYPE = {
         "X": ["template", "min", "avg"],
         "Y": ["template", "min", "avg"],
@@ -64,17 +67,15 @@ FEATURE_TYPE = {
         "AX": ["template", "min", "avg"],
         "AY": ["template", "min", "avg"],
         }
-PERSON_COUNT = 40
-SIG_COUNT = 40
-GENUINE_COUNT = 20
-TRAINING_SET_COUNT = 20
-REF_COUNT = 8
+# Data settings
+
+REF_COUNT = 3
 CLASSIFIER = "RFC" # "RFC", "GBC", "SVM", "MLP"
 
 # Random Forest Tree settings
 MAX_DEPTH = 3
 MAX_FEATURES = None
-N_ESTIMATORS = 200
+N_ESTIMATORS = 300
 MIN_SAMPLES_LEAF = 1
 N_JOBS = 1
 
@@ -87,7 +88,6 @@ LOGGER.info("SizeNormalizationSwitch: %s" % SIZE_NORM_SWITCH)
 LOGGER.info("RandomForgeryInclude: %s" % RANDOM_FORGERY_INCLUDE)
 LOGGER.info("ClassifierType: %s" % CLASSIFIER)
 LOGGER.info("LocalNormalizationType: %s" % LOCAL_NORMAL_TYPE)
-LOGGER.info("TrainingSetCount: %d" % TRAINING_SET_COUNT)
 LOGGER.info("Reference Count: %d" % REF_COUNT)
 LOGGER.info("Method: %d" % METHOD)
 LOGGER.info("Signal List: %s" % SigCompList)
@@ -134,9 +134,8 @@ def naive_dtw(A, B, p=5, t=5):
 
 class Person(object):
 
-    def __init__(self, refSigs, testSigs, key = None):
+    def __init__(self, refSigs, testSigs):
 
-        self.key = key
         self.refSigs = refSigs
         self.testSigs = testSigs
         self.refCount = len(refSigs)
@@ -240,15 +239,19 @@ class PersonTraining(Person):
     def __init__(self, signatures):
         """
         """
-        # eight reference signatures
-        super(PersonTraining, self).__init__(signatures[0:REF_COUNT], signatures[REF_COUNT:])
+        super(PersonTraining, self).__init__(signatures["genuine"][0:REF_COUNT],
+                signatures["genuine"][REF_COUNT:]+signatures["forgery"])
         
-        self.genuineSigs = self.testSigs[:GENUINE_COUNT-REF_COUNT]
-        self.forgerySigs = self.testSigs[GENUINE_COUNT-REF_COUNT:]
+        self.genuineSigs = signatures["genuine"][REF_COUNT:]
+        self.forgerySigs = signatures["forgery"]
 
-        LOGGER.info("Reference signature count: %d, test signature count: %d, \
-                genuine test signatures: %d, forgery test signatures: %d" % \
-                (self.refCount, len(self.testSigs), len(self.genuineSigs), len(self.forgerySigs)))
+        # LOGGER.info("Reference signature count: %d, test signature count: %d, \
+                # genuine test signatures: %d, forgery test signatures: %d" % \
+                # (self.refCount, len(self.testSigs), len(self.genuineSigs), len(self.forgerySigs)))
+        LOGGER.info("Reference signature count: %d" % self.refCount)
+        LOGGER.info("Test signature count: %d" % len(self.testSigs))
+        LOGGER.info("Genuine test signature: %d" % len(self.genuineSigs))
+        LOGGER.info("Forgery test signature: %d" % len(self.forgerySigs))
 
     def calc_train_set(self):
         """
@@ -272,12 +275,20 @@ class PersonTraining(Person):
 
 class Driver():
     def __init__(self):
-        signatures = self.get_data_from_task2()
-        signatures = self.pre_process(signatures)
-        LOGGER.info("Total signatures: %d" % len(signatures))
-        signatures = self.reconstructSignatures(signatures)
-        self.train_set, self.test_set = self.train_test_split(signatures)
-        LOGGER.info("Spliting value set, training_set %d, test_set %d" % (len(self.train_set), len(self.test_set)))
+
+        self.processor = processor.PreProcessor()
+
+        trainSets, testSets = self.get_signatures_from_susig()
+        self.train_set = trainSets
+        self.test_set = testSets
+
+        LOGGER.info("Train set count : %d" % len(trainSets))
+        LOGGER.info("Test set count : %d" % len(testSets))
+        LOGGER.info("Genuine count in train set : %d" % len(trainSets[0]["genuine"]))
+        LOGGER.info("Forgery count in train set : %d" % len(trainSets[0]["forgery"]))
+        LOGGER.info("Genuine count in test set : %d" % len(testSets[0]["genuine"]))
+        LOGGER.info("Forgery count in test set : %d" % len(testSets[0]["forgery"]))
+
 
         if CLASSIFIER == "SVM":
             self.svm = svm.SVC()
@@ -308,81 +319,123 @@ class Driver():
 
         self.svm.fit(trainX, trainY)
 
-    def pre_process(self, signatures):
-        """
-        Apply size normalization and localtion normalization
-        """
-        self.processor = processor.PreProcessor()
-        result = []
-        for uid in range(PERSON_COUNT):
-            uSigs = []
-            for sid in range(SIG_COUNT):
-                RX = signatures[uid][sid][0]
-                RY = signatures[uid][sid][1]
-                P = signatures[uid][sid][2]
-                if SIZE_NORM_SWITCH:
-                    RX, RY = self.processor.size_normalization(RX, RY, 400, 200)
-                if LOCAL_NORMAL_TYPE == "mid":
-                    RX, RY = self.processor.location_normalization(RX, RY)
-                elif LOCAL_NORMAL_TYPE == "offset":
-                    RX, RY = self.processor.offset_to_origin_normalization(RX, RY)
-                uSigs.append([RX, RY, P])
-            result.append(uSigs)
-        return result
+    def pre_process_for_signle_signature(self, signature):
+        RX = signature[0]
+        RY = signature[1]
+        P  = signature[2]
+        if SIZE_NORM_SWITCH:
+            RX, RY = self.processor.size_normalization(RX, RY, 400, 200)
+        if LOCAL_NORMAL_TYPE == "mid":
+            RX, RY = self.processor.location_normalization(RX, RY)
+        elif LOCAL_NORMAL_TYPE == "offset":
+            RX, RY = self.processor.offset_to_origin_normalization(RX, RY)
+        return [RX, RY, P]
 
-    def get_data_from_task2(self):
+    def reconstructSignature(self, signature):
         """
-        Load original data from svc2004 task2
+        Reconstruct signature to dictionary like object
         """
-        LOGGER.info("Getting signatures")
-        signatures = []
-        dataPath = "../data/Task2"
-        for uid in range(1, 41):
-            personSigs = []
-            for sig in range(1, 41):
-                fileName = "U%dS%d.TXT" % (uid, sig)
-                filePath = os.path.join(dataPath, fileName)
-                X, Y, T, P = utils.get_data_from_file(filePath)
-                personSigs.append([X, Y, P])
-            signatures.append(personSigs)
+        X = signature[0]
+        Y = signature[1]
+        P = signature[2]
+        VX = self.calculate_delta(X)
+        VY = self.calculate_delta(Y)
+        VP = self.calculate_delta(P)
+        AX = self.calculate_delta(VX)
+        AY = self.calculate_delta(VY)
+        signature = {"X": X, "Y": Y, "P": P, "VX": VX, "VY": VY, "VP": VP, "AX": AX, "AY": AY}
+        return signature
+
+    def get_signatures_from_susig_folder(self, folder):
+        
+        signatures = {}
+        for fileName in os.listdir(folder):
+            filePath = os.path.join(folder, fileName)
+            with open(filePath) as fp:
+                lines = fp.readlines()
+                X = []
+                Y = []
+                T = []
+                P = []
+                for line in lines[2:]:
+                    items = line.split()
+                    X.append(float(items[0]))
+                    Y.append(float(items[1]))
+                    T.append(float(items[2]))
+                    P.append(float(items[3]))
+                personID = fileName.split(".")[0].split("_")[0]
+                if personID not in signatures:
+                    signatures[personID] = []
+                signature = self.pre_process_for_signle_signature([X, Y, P])
+                signature = self.reconstructSignature(signature)
+                signatures[personID].append(signature)
         return signatures
 
-    def get_data_from_susig(self):
+    def get_signatures_from_susig(self):
         """
         Load original data from susig
+        @return: trainSets, testSets
         """
+        LOGGER.info("Getting signatures from susig")
+        trainSignatures = {}
 
-    def reconstructSignatures(self, signatures):
+        # For train forgery
+        trainForgeryFolder = "../data/SUSig/VisualSubCorpus/FORGERY"
+        trainForgerySubSigs = self.get_signatures_from_susig_folder(trainForgeryFolder)
+        for (personID, value) in trainForgerySubSigs.items():
+            if personID not in trainSignatures:
+                trainSignatures[personID] = {"genuine": [], "forgery": []}
+            trainSignatures[personID]["forgery"].extend(value)
+
+        # For train genuine session1
+        trainGenuineSession1Folder = "../data/SUSig/VisualSubCorpus/GENUINE/SESSION1"
+        trainGenuineSession1SubSigs= self.get_signatures_from_susig_folder(trainGenuineSession1Folder)
+        for (personID, value) in trainGenuineSession1SubSigs.items():
+            if personID not in trainSignatures:
+                trainSignatures[personID] = {"genuine": [], "forgery": []}
+            trainSignatures[personID]["genuine"].extend(value)
+
+        # For train genuine session2
+        trainGenuineSession2Folder = "../data/SUSig/VisualSubCorpus/GENUINE/SESSION2"
+        trainGenuineSession2SubSigs = self.get_signatures_from_susig_folder(trainGenuineSession2Folder)
+        for (personID, value) in trainGenuineSession2SubSigs.items():
+            if personID not in trainSignatures:
+                trainSignatures[personID] = {"genuine": [], "forgery": []}
+            trainSignatures[personID]["genuine"].extend(value)
+
+        trainSets = trainSignatures.values()
+
+        # For test sets
+        testSignatures = {}
+        testForgeryFolder = "../data/SUSig/VisualSubCorpus/VALIDATION/VALIDATION_FORGERY"
+        testForgerySubSigs = self.get_signatures_from_susig_folder(testForgeryFolder)
+        for (personID, value) in testForgerySubSigs.items():
+            if personID not in testSignatures:
+                testSignatures[personID] = {"genuine": [], "forgery": []}
+            testSignatures[personID]["forgery"].extend(value)
+
+        testGenuineFolder = "../data/SUSig/VisualSubCorpus/VALIDATION/VALIDATION_GENUINE"
+        testGenuineSubSigs = self.get_signatures_from_susig_folder(testGenuineFolder)
+        for (personID, value) in testGenuineSubSigs.items():
+            if personID not in testSignatures:
+                testSignatures[personID] = {"genuine": [], "forgery": []}
+            testSignatures[personID]["genuine"].extend(value)
+        testSets = testSignatures.values()
+
         """
-        Reconstruct signatures to dictionary like object.
+        print "train set count : %d" % len(trainSets)
+        print "test set count : %d" % len(testSets)
+
+        print "train set genuine count: %d" % len(trainSets[0]["genuine"])
+        print "train set forgery count: %d" % len(trainSets[0]["forgery"])
+        print "test set genuine count: %d" % len(testSets[0]["genuine"])
+        print "test set forgery count: %d" % len(testSets[0]["forgery"])
         """
-        reconstructedSigs = []
-        for uid in range(PERSON_COUNT):
-            uSigs = []
-            for sid in range(SIG_COUNT):
-                signature = signatures[uid][sid]
-                X = signature[0]
-                Y = signature[1]
-                P = signature[2]
-                VX = self.calculate_delta(X)
-                VY = self.calculate_delta(Y)
-                VP = self.calculate_delta(P)
-                AX = self.calculate_delta(VX)
-                AY = self.calculate_delta(VY)
-                uSigs.append({"X": X, "Y": Y, "P": P, "VX": VX, "VY": VY, "VP": VP, "AX": AX, "AY": AY})
-            reconstructedSigs.append(uSigs)
-        return reconstructedSigs
+        return trainSets[0:1], testSets
 
     def calculate_delta(self, valueList):
         deltaValueList = [valueList[i] - valueList[i-1] for i in range(1, len(valueList))]
         return deltaValueList
-
-    def train_test_split(self, signatures):
-        """
-        return training_set & test_set
-        """
-        trainCount = TRAINING_SET_COUNT
-        return signatures[0:trainCount], signatures[trainCount:PERSON_COUNT]
 
     def test(self):
         LOGGER.info("Start test")
@@ -397,9 +450,9 @@ class Driver():
             one_test_set = test_set[i]
             LOGGER.info("Test signature: %d" % count)
             count += 1
-            personTest = PersonTest(one_test_set[0:REF_COUNT])
-            genuine_set = one_test_set[REF_COUNT:GENUINE_COUNT]
-            forgery_set = one_test_set[GENUINE_COUNT:PERSON_COUNT]
+            personTest = PersonTest(one_test_set["genuine"][0:REF_COUNT])
+            genuine_set = one_test_set["genuine"][REF_COUNT:]
+            forgery_set = one_test_set["forgery"]
             random_set = []
 
             for j in range(len(genuine_set)):
@@ -415,7 +468,7 @@ class Driver():
                 sig = forgery_set[j]
                 dis = personTest.calc_dis(sig)
                 res = self.svm.predict(dis)
-                LOGGER.info("Forgery Test: Result: %s, %s" % (dis, res))
+                LOGGER.info("Forgery Test: Result: %s, %s" % (res, dis))
                 forgery_test_result.append(res)
                 if (res != 0):
                     LOGGER.fatal("FalseAccept: uid: %d, sid: %d" % (i, j))
@@ -424,10 +477,13 @@ class Driver():
                 for j in range(len(test_set)):
                     if i == j:
                         continue
-                    random_set.extend(test_set[j])
+                    random_set.extend(test_set[j]["genuine"])
+                    random_set.extend(test_set[j]["forgery"])
+
                 # train set included
                 for one_train_set in self.train_set:
-                    random_set.extend(one_train_set)
+                    random_set.extend(one_train_set["genuine"])
+                    random_set.extend(one_train_set["forgery"])
 
                 for j in range(len(random_set)):
                     sig = random_set[j]
