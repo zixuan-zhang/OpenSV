@@ -11,21 +11,16 @@ import java.util.*;
 import java.util.logging.FileHandler;
 import java.util.logging.Level;
 
-import net.sf.javaml.classification.Classifier;
-import net.sf.javaml.classification.KNearestNeighbors;
-import net.sf.javaml.core.Dataset;
-import net.sf.javaml.core.DefaultDataset;
-import net.sf.javaml.core.DenseInstance;
-//import net.sf.javaml.core.SparseInstance;
-//import net.sf.javaml.tools.ListTools;
-//import weka.classifiers.trees.RandomForest;
-//import weka.core.DenseInstance;
-//import weka.core.Instances;
+import weka.core.Attribute;
+import weka.core.Instances;
+import weka.core.DenseInstance;
+import weka.classifiers.Classifier;
+import weka.classifiers.bayes.NaiveBayes;
+import weka.classifiers.trees.RandomForest;
+import weka.core.SerializationHelper;
 
 
 public class Driver {
-
-
     public Driver() throws Exception
     {
         /*
@@ -62,29 +57,50 @@ public class Driver {
         // Utils.logger.log(Level.INFO, "GenuineX count: {0}", genuineX.size());
         // Utils.logger.log(Level.INFO, "ForgeryX count: {0}", forgeryX.size());
 
-        classifier = new KNearestNeighbors(5);
-        Dataset dataset = new DefaultDataset();
+        classifier = new RandomForest();
+
+        ArrayList<Attribute> attributes = new ArrayList<Attribute>();
+        for (int i = 0; i < Config.SigComList.size() * Config.GetFeatureType().size() + 1; ++i)
+        {
+            attributes.add(new Attribute(String.valueOf(i)));
+        }
+        instances = new Instances("Instances", attributes, 0);
+        instances.setClassIndex(instances.numAttributes() - 1);
+
         for (int i = 0; i < genuineX.size(); ++i)
         {
-            double[] array = genuineX.get(i).stream().mapToDouble(d->d).toArray();
-            DenseInstance instance = new DenseInstance(array, 1);
-            dataset.add(instance);
+            ArrayList<Double> newArray = genuineX.get(i);
+            newArray.add(1.0);
+            double[] array = newArray.stream().mapToDouble(d->d).toArray();
+            instances.add(new DenseInstance(1.0, array));
         }
         for (int i = 0; i < forgeryX.size(); ++i)
         {
-            double[] array = forgeryX.get(i).stream().mapToDouble(d->d).toArray();
-            DenseInstance instance = new DenseInstance(array, 0);
-            dataset.add(instance);
+            ArrayList<Double> newArray = forgeryX.get(i);
+            newArray.add(0.0);
+            double[] array = newArray.stream().mapToDouble(d->d).toArray();
+            instances.add(new DenseInstance(1.0, array));
         }
 
         // Utils.logger.log(Level.INFO, "trainDataSet size: {0}", dataset.size());
         // Fit classifier
-        classifier.buildClassifier(dataset);
+        classifier.buildClassifier(instances);
+
+        SerializationHelper.write(Config.DumpFilePath, classifier);
     }
 
     public void test()
     {
         // Utils.logger.log(Level.INFO, "Start test");
+        try
+        {
+            classifier = (RandomForest)SerializationHelper.read(Config.DumpFilePath);
+        }
+        catch (Exception e)
+        {
+            Utils.logger.log(Level.INFO, "Load classifier failed, {0}", e.toString());
+            System.exit(-1);
+        }
 
         int genuineCount = 0;
         int forgeryCount = 0;
@@ -102,22 +118,43 @@ public class Driver {
             {
                 ArrayList<Double> feature = personTest.CalcDis(genuineSet.get(i));
                 double[] array = feature.stream().mapToDouble(d->d).toArray();
-                DenseInstance instance = new DenseInstance(array, 1);
-                Object predictedValue = this.classifier.classify(instance);
-                if (!predictedValue.equals(instance.classValue())) {
-                    // Utils.logger.log(Level.INFO, "FalseReject: {0} {1}", new Object[]{personSignature.GetUserName(), i});
-                    falseRejectCount += 1;
+                DenseInstance instance = new DenseInstance(1.0, array);
+                instance.setDataset(instances);
+                try
+                {
+                    Double classify = this.classifier.classifyInstance(instance);
+                    if (classify < 0.5)
+                    {
+                        // Utils.logger.log(Level.INFO, "FalseReject: {0} {1}", new Object[]{personSignature.GetUserName(), i});
+                        falseRejectCount += 1;
+                    }
+                }
+                catch (java.lang.Exception e)
+                {
+                    Utils.logger.log(Level.INFO, "Exception when classify instance {0}", e.toString());
+                    System.exit(-1);
                 }
             }
             for (int i = 0; i < forgerySet.size(); ++i)
             {
                 ArrayList<Double> feature = personTest.CalcDis(forgerySet.get(i));
                 double[] array = feature.stream().mapToDouble(d->d).toArray();
-                DenseInstance instance = new DenseInstance(array, 0);
-                Object predictedValue = this.classifier.classify(instance);
-                if (!predictedValue.equals(instance.classValue())) {
-                    // Utils.logger.log(Level.INFO, "FalseAccepted: {0} {1}", new Object[]{personSignature.GetUserName(), i});
-                    falseAcceptCount += 1;
+                DenseInstance instance = new DenseInstance(0.0, array);
+                instance.setDataset(instances);
+                try
+                {
+                    Double classify = this.classifier.classifyInstance(instance);
+                    if (classify > 0.5)
+                    {
+                        // Utils.logger.log(Level.INFO, "FalseAccepted: {0} {1}", new Object[]{personSignature.GetUserName(), i});
+                        falseAcceptCount += 1;
+                    }
+
+                }
+                catch (Exception e)
+                {
+                    Utils.logger.log(Level.INFO, "Exception when classify instance {0}", e.toString());
+                    System.exit(-1);
                 }
             }
         }
@@ -353,6 +390,8 @@ public class Driver {
     private ArrayList<PersonSignatures> testSets;
 
     private Classifier classifier;
+
+    private Instances instances;
 
     private FileHandler fh;
 }

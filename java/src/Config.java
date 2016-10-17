@@ -68,19 +68,19 @@ public class Config{
         }
     };
 
-    private static ArrayList<String> getFeatureType()
+    public static ArrayList<String> GetFeatureType()
     {
         return new ArrayList<String>(Arrays.asList(Config.Min, Config.Median, Config.Template));
     }
 
     public static HashMap<String, ArrayList<String>> FeatureType = new HashMap<String, ArrayList<String>>(){
         {
-            put("X", getFeatureType());
-            put("Y", getFeatureType());
-            put("VX", getFeatureType());
-            put("VY", getFeatureType());
-            put("P", getFeatureType());
-            put("VP", getFeatureType());
+            put("X", GetFeatureType());
+            put("Y", GetFeatureType());
+            put("VX", GetFeatureType());
+            put("VY", GetFeatureType());
+            put("P", GetFeatureType());
+            put("VP", GetFeatureType());
         }
     };
 
