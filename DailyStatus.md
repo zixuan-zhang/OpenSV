@@ -1,3 +1,13 @@
+## 2016.10.17
+## Done
+1. 使用weka替换java-ml
+2. 使用weka的persistence方法，可以序列化到文件
+3. 使用weka的RandomForest来测试，(X, Y, VX, VY), DTWMethod=1, (Min, Med, Temp)的组合得到了0.89, 1, 0.945的结果。目前最好。
+
+## TODO
+1. 收集第三批人的签名数据
+2. 尝试降低FalseRejectRate
+
 ## 2016.10.11
 ### Done
 1. 继续测试，使用(X, Y, VX), DTWMethod=1, (Min, Med, Temp)的组合得到了0.87, 0.99, 0.93的结果
