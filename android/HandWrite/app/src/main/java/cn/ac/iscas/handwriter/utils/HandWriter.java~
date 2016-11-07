@@ -1,0 +1,23 @@
+package cn.ac.iscas.handwriter.utils;
+
+import cn.ac.iscas.handwriter.MainActivity;
+import cn.ac.iscas.handwriter.UnlockActivity;
+import java.util.ArrayList;
+
+public class HandWriter 
+{
+        ArrayList mrecords;
+        public boolean register()
+        {
+                mrecords=MainActivity.getrecords();
+                if(mrecords.size()==5)
+                        return true;
+                return false;
+        }
+        public boolean check(){
+                mrecords=UnlockActivity.getrecords();
+                if(mrecords.size()==2)
+                        return true;
+                return false;
+        }
+}
