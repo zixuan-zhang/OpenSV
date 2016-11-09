@@ -7,5 +7,9 @@
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
+    <orderEntry type="library" name="weka-stable-3.8.0" level="project" />
+    <orderEntry type="library" name="com.github.fracpete:command-to-code-weka-package:2016.5.8" level="project" />
+    <orderEntry type="library" name="wekaSTRIPPED" level="project" />
+    <orderEntry type="library" name="weka" level="project" />
   </component>
 </module>

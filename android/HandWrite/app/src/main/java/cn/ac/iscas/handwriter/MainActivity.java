@@ -60,33 +60,23 @@ public class MainActivity extends Activity {
     private final String APPLCK_KEY = "APPLOCK";
     
     private static ArrayList mrecords=new ArrayList();
-    private HandWriter mhandwriter= HandWriter.GetInstance();
+    private HandWriter mhandwriter;
     //end
 
-    public static Classifier classifier = null;
+    public static Database database = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
 
         super.onCreate(savedInstanceState);
+
+        // init database
+
         setContentView(R.layout.activity_main);
 
-        AssetManager am = getAssets();
-        String classifierDumpFile = "classifer.dump";
-        try
-        {
-            InputStream classifierInput = am.open(classifierDumpFile);
-            classifier = (RandomForest) SerializationHelper.read(classifierInput);
-        }
-        catch (IOException e)
-        {
-            System.out.println("IOException when load classifier dump file" + e.toString());
-        }
-        catch (Exception e)
-        {
-            System.out.println("Exception when load classifier dump file" + e.toString());
-        }
 
+        database = new Database(this);
+        mhandwriter = HandWriter.GetInstance();
 
         mUserPreferences = getSharedPreferences(PREFS_USER, MODE_PRIVATE);
         mUserEditor = mUserPreferences.edit();

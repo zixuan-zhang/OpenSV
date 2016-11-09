@@ -15,7 +15,6 @@ import weka.core.Attribute;
 import weka.core.Instances;
 import weka.core.DenseInstance;
 import weka.classifiers.Classifier;
-import weka.classifiers.bayes.NaiveBayes;
 import weka.classifiers.trees.RandomForest;
 import weka.core.SerializationHelper;
 
@@ -23,13 +22,6 @@ import weka.core.SerializationHelper;
 public class Driver {
     public Driver() throws Exception
     {
-        /*
-        if (!Init())
-        {
-            throw new Exception("Error when init");
-        }
-        */
-
         if (Config.Database.equals("SVC"))
             GetSVCSignatures();
         else if (Config.Database.equals(Config.SUSIGDatabase) || Config.Database.equals(Config.SelfDatabase))

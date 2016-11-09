@@ -8,10 +8,13 @@ package cn.ac.iscas.handwriter.utils;
  * Created by zixuan on 2016/9/1.
  */
 
+import android.os.Environment;
+
+import java.io.File;
+import java.io.FileOutputStream;
 import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.logging.Level;
 
 public class Config{
     public static final Double PreWidth = 400.0;
@@ -89,6 +92,7 @@ public class Config{
             put("VP", GetFeatureType());
         }
     };
+
 }
 
 

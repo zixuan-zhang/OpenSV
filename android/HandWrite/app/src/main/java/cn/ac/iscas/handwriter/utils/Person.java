@@ -4,15 +4,16 @@ package cn.ac.iscas.handwriter.utils;
  * Created by zixuan on 2016/11/1.
  */
 
+import android.util.Log;
+
 import java.lang.Math;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.logging.Level;
 
 public class Person {
     public Person(ArrayList<Signature> refSigs)
     {
-        // Utils.logger.log(Level.INFO, "Reference signature count: {0}", refSigs.size());
+        Log.i(Tag, "Reference signature count: " + refSigs.size());
         this.refSigs = refSigs;
         // Select template signature
         this.SelectTemplate();
@@ -27,7 +28,7 @@ public class Person {
      */
     public void SelectTemplate()
     {
-        // Utils.logger.log(Level.INFO, "Selecting template signature");
+        Log.i(Tag, "Selecting template signature");
         ArrayList<Double> refDis = new ArrayList<>();
         for (int i = 0; i < this.GetRefCount(); ++i)
         {
@@ -51,6 +52,7 @@ public class Person {
         this.templateIndex = Utils.GetMinIndex(refDis);
         this.templateSig = refSigs.get(this.templateIndex);
         // Utils.logger.log(Level.INFO, "Template index: {0}.", new Object[]{templateIndex});
+        Log.d(Tag, "Template index: " + templateIndex);
     }
 
     /*
@@ -58,7 +60,7 @@ public class Person {
      */
     public void CalcBaseDis()
     {
-        // Utils.logger.log(Level.INFO, "calculating base distance");
+        Log.i(Tag, "Calculating base distance");
         for (int k = 0; k < Config.SigComList.size(); ++k)
         {
             String com = Config.SigComList.get(k);
@@ -191,4 +193,5 @@ public class Person {
     public Signature templateSig;
     public int templateIndex;
     public HashMap<String, Double> baseValueMap;
+    private final String Tag = "Person";
 }
