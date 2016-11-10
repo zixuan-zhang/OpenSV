@@ -1,3 +1,6 @@
+## 2016.11.10
+1. 又采集了第三批10个人的签名，并且进行了实验。使用weka for Android的RandomForest来测试，(X, Y, VX, VY), DTWMethod=1, (Min, Med, Temp)的组合得到了0.917, 0.95, 0.933的结果。FRR有提升，FAR下降明显。
+
 ## 2016.11.9
 ### Done
 1. 添加签名持久化
