@@ -1,5 +1,9 @@
 ## 2016.11.10
-1. 又采集了第三批10个人的签名，并且进行了实验。使用weka for Android的RandomForest来测试，(X, Y, VX, VY), DTWMethod=1, (Min, Med, Temp)的组合得到了0.917, 0.95, 0.933的结果。FRR有提升，FAR下降明显。
+1. 又采集了第三批10个人的签名，并且进行了实验。
+2. 使用weka for Android的RandomForest来测试，(X, Y, VX, VY), DTWMethod=1, (Min, Med, Temp)的组合得到了0.917, 0.95, 0.933的结果。FRR有提升，FAR下降明显。
+3. 使用weka for Android的RandomForest来测试，(X, Y, VX, VY, P), DTWMethod=1, (Min, Med, Temp)的组合得到了0.945, 0.93, 0.937的结果。FRR大有提升，FAR下降更明显。
+4. 进行了多次试验，实验效果已经记录。最好的一次： weka for Android的RandomForest来测试，(X, Y, VX, VY, P}, DTWMethod=1, (Min, Temp)的组合得到了0.963, 0.945, 0.954的结果。目前最佳。
+
 
 ## 2016.11.9
 ### Done
