@@ -11,6 +11,12 @@ import java.util.ArrayList;
 import java.util.HashMap;
 
 public class Person {
+    public ArrayList<Signature> refSigs;
+    public Signature templateSig;
+    public int templateIndex;
+    public HashMap<String, Double> baseValueMap;
+    private final String Tag = "Person";
+
     public Person(ArrayList<Signature> refSigs)
     {
         Log.i(Tag, "Reference signature count: " + refSigs.size());
@@ -21,7 +27,6 @@ public class Person {
         this.baseValueMap = new HashMap<>();
         this.CalcBaseDis();
     }
-
 
     /*
     @Description: Select template signature from reference signatures.
@@ -42,7 +47,6 @@ public class Person {
                 {
                     ArrayList<Double> signal1 = refSigs.get(i).GetCom(com);
                     ArrayList<Double> signal2 = refSigs.get(j).GetCom(com);
-                    // comDisList.add(NaiveDTW(signal1, signal2, Config.Penalization.get(com), Config.Threshold.get(com)));
                     comDisList.add(NaiveDTW(refSigs.get(i).GetCom(com), refSigs.get(j).GetCom(com), Config.Penalization.get(com), Config.Threshold.get(com)));
                 }
                 dis += Utils.GetMeanValue(comDisList);
@@ -68,6 +72,7 @@ public class Person {
             ArrayList<Double> maxComList = new ArrayList<>();
             ArrayList<Double> minComList = new ArrayList<>();
             ArrayList<Double> avgComList = new ArrayList<>();
+            ArrayList<Double> medComList = new ArrayList<>();
 
             for (int i = 0; i < this.GetRefCount(); ++i)
             {
@@ -88,6 +93,7 @@ public class Person {
                 maxComList.add(Utils.GetMaxValue(comDisList));
                 minComList.add(Utils.GetMinValue(comDisList));
                 avgComList.add(Utils.GetMeanValue(comDisList));
+                medComList.add(Utils.GetMedianValue(comDisList));
             }
             if (Config.FeatureType.get(com).indexOf(Config.Template) != -1)
                 this.baseValueMap.put(Config.Template+com, Utils.GetMeanValue(templateComList));
@@ -98,15 +104,7 @@ public class Person {
             if (Config.FeatureType.get(com).indexOf(Config.Avg) != -1)
                 this.baseValueMap.put(Config.Avg+com, Utils.GetMeanValue(avgComList));
             if (Config.FeatureType.get(com).indexOf(Config.Median) != -1)
-                this.baseValueMap.put(Config.Median+com, Utils.GetMedianValue(avgComList));
-            /*
-            Utils.logger.log(Level.INFO, "Calculating signal: {0} {1} {2} {3} {4}",
-                    new Object[]{com,
-                    this.baseValueMap.get(Config.Template+com),
-                    this.baseValueMap.get(Config.Max+com),
-                    this.baseValueMap.get(Config.Min+com),
-                    this.baseValueMap.get(Config.Avg+com)});
-            */
+                this.baseValueMap.put(Config.Median+com, Utils.GetMeanValue(medComList));
         }
     }
 
@@ -188,10 +186,4 @@ public class Person {
 
         return distance[size1-1][size2-1];
     }
-
-    public ArrayList<Signature> refSigs;
-    public Signature templateSig;
-    public int templateIndex;
-    public HashMap<String, Double> baseValueMap;
-    private final String Tag = "Person";
 }

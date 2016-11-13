@@ -8,7 +8,6 @@ package cn.ac.iscas.handwriter.utils;
  * Created by zixuan on 2016/9/1.
  */
 
-import java.lang.reflect.Array;
 import java.util.ArrayList;
 
 public class Processor {

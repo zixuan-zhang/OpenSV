@@ -6,16 +6,13 @@ import android.content.Context;
 import android.content.Intent; 
  
 public class BootCompletedReceiver extends BroadcastReceiver { 
-	
-	@Override 
+	@Override
 	public void onReceive(Context context, Intent intent) { 
 		if (intent.getAction().equals(Intent.ACTION_BOOT_COMPLETED)) 
 		{
 			AppLockService.hasoffed = true;
-			Intent sevice = new Intent(context, AppLockService.class);
-			context.startService(sevice);
+			Intent iSevice = new Intent(context, AppLockService.class);
+			context.startService(iSevice);
 	        }       
 	}
- 
-	 
 }

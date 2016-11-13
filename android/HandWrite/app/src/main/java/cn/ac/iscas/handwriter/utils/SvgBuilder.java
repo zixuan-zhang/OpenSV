@@ -1,7 +1,6 @@
 package cn.ac.iscas.handwriter.utils;
 
 public class SvgBuilder {
-
     private final StringBuilder mSvgPathsBuilder = new StringBuilder();
     private SvgPathBuilder mCurrentPathBuilder = null;
 

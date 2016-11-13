@@ -1,17 +1,9 @@
 package cn.ac.iscas.handwriter.utils;
 
 /**
- * Created by zixuan on 2016/11/1.
- */
-
-/**
  * Created by zixuan on 2016/9/1.
  */
 
-import android.os.Environment;
-
-import java.io.File;
-import java.io.FileOutputStream;
 import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -26,34 +18,11 @@ public class Config{
     public static final String Max = "max";
     public static final String Median = "median";
 
-    public static final String Forgery = "FORGERY";
-    public static final String Genuine = "GENUINE";
-    /** SUSIG database settings. */
-    public static final String SusigDataPath = "F:\\data\\SUSig";
-    public static final String BlindSubCorpus = "BlindSubCorpus";
-    public static final String VisualSubCorpus = "VisualSubCorpus";
-    /** SVC2004 database settings. */
-    public static final String SvcDataPath = "F:\\data\\Task2";
-    /** Self database settings. */
-    public static final String SelfDataPath = "F:\\data\\self";
-
-    public static final String SelfDatabase = "Self";
-    public static final String SUSIGDatabase = "SUSIG";
-    public static final String SvcDatabase = "SVC";
-
-    public static final String Database = SelfDatabase;
-
-    public static final Double TrainSetRate = 0.7;
-
-    public static final String LogPath = "F:\\data\\log\\OpenSV.log";
-
-    public static ArrayList<String> SigComList = new ArrayList<String>(Arrays.asList("X", "Y", "VX", "VY"));
+    public static ArrayList<String> SigComList = new ArrayList<String>(Arrays.asList("X", "Y", "VX", "VY", "P"));
 
     public static int DTWMethod= 1;
-
     public static final int RefCount = 5;
-
-    public static final String DumpFilePath = "F:\\data\\classifer.dump";
+    public static final String DatabaseTableName = "signature_records";
 
     public static HashMap<String, Double> Penalization = new HashMap<String, Double>(){
         {
@@ -79,7 +48,7 @@ public class Config{
 
     public static ArrayList<String> GetFeatureType()
     {
-        return new ArrayList<String>(Arrays.asList(Config.Min, Config.Median, Config.Template));
+        return new ArrayList<String>(Arrays.asList(Config.Min, Config.Template));
     }
 
     public static HashMap<String, ArrayList<String>> FeatureType = new HashMap<String, ArrayList<String>>(){

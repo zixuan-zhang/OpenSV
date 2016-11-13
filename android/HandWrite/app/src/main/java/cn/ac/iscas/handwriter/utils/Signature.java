@@ -12,6 +12,12 @@ import java.util.ArrayList;
 import java.util.HashMap;
 
 public class Signature {
+    private HashMap<String, ArrayList<Double>> _signature;
+    private String userName;
+    private String signatureID;
+    private String sampleID;
+    private int label;
+
     public Signature()
     {
         _signature = new HashMap<>();
@@ -54,15 +60,5 @@ public class Signature {
         else
             return null;
     }
-
-    private HashMap<String, ArrayList<Double>> _signature;
-
-    private String userName;
-
-    private String signatureID;
-
-    private String sampleID;
-
-    private int label;
 }
 

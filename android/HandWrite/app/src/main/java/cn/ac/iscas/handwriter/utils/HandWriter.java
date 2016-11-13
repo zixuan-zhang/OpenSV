@@ -1,29 +1,25 @@
 package cn.ac.iscas.handwriter.utils;
 
-import android.os.Environment;
+import java.util.ArrayList;
+
 import android.util.Log;
 import android.util.SparseArray;
 import android.database.Cursor;
+
+import weka.core.Attribute;
+import weka.core.DenseInstance;
+import weka.core.Instances;
 
 import cn.ac.iscas.handwriter.Database;
 import cn.ac.iscas.handwriter.MainActivity;
 import cn.ac.iscas.handwriter.UnlockActivity;
 import cn.ac.iscas.handwriter.views.SignaturePad;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.util.ArrayList;
-
-import weka.core.Attribute;
-import weka.core.DenseInstance;
-import weka.core.Instances;
-
 public class HandWriter
 {
     public boolean register()
     {
-        ArrayList<SparseArray<SignaturePad.MotionEventRecorder>> records=MainActivity.getrecords();
+        ArrayList<SparseArray<SignaturePad.MotionEventRecorder>> records = MainActivity.getRecords();
         if (records.size() < 5)
         {
             Log.i(Tag, "Registered signature size can not be less than 5");
@@ -53,7 +49,7 @@ public class HandWriter
             return false;
         }
 
-        ArrayList<SparseArray<SignaturePad.MotionEventRecorder>> records= UnlockActivity.getrecords();
+        ArrayList<SparseArray<SignaturePad.MotionEventRecorder>> records= UnlockActivity.getRecords();
         System.out.println("record size " + records.size());
         if (records.size() != 1)
         {
@@ -176,75 +172,53 @@ public class HandWriter
     }
 
     private static class HandWrittenVerifierSingletonHolder {
-        public static final HandWriter Instance = new HandWriter();
+        static final HandWriter Instance = new HandWriter();
     }
 
     private HandWriter() {
-        try
-        {
-            sdLog = new FileOutputStream(new File(Environment.getExternalStorageDirectory().getCanonicalPath(), "writer.log"), true);
+        _person = null;
+
+        // load signatures from database if exist.
+        if (MainActivity.database != null) {
+            _database = MainActivity.database;
+            Log.d(Tag, "MainActivity database is not null");
         }
-        catch (IOException e)
-        {
-            Log.e(Tag, "Error when create sdLog");
+        if (UnlockActivity.database != null) {
+            Log.d(Tag, "UnlockActivity database is not null");
+            _database = UnlockActivity.database;
         }
+        if (_database == null) {
+            Log.e(Tag, "Database is null when initialize HandWriter");
+        }
+        if (_database != null && _database.searchTotalCount() > 0) {
+            Log.i(Tag, "Found signature records when initialize HandWriter, reload them");
+            ArrayList<Signature> signatures = new ArrayList<>();
+            for (int sigId = 0; sigId < 5; ++sigId) {
+                Cursor cursor = _database.searchBySignatureId(sigId);
+                ArrayList<Double> T = new ArrayList<>();
+                ArrayList<Double> X = new ArrayList<>();
+                ArrayList<Double> Y = new ArrayList<>();
+                ArrayList<Double> P = new ArrayList<>();
 
-        try
-        {
-            _person = null;
-
-            // load signatures from database if exist.
-            if (MainActivity.database != null) {
-                _database = MainActivity.database;
-                Log.d(Tag, "MainActivity database is not null");
-                sdLog.write("MainActivity database is not null".getBytes());
-            }
-            if (UnlockActivity.database != null) {
-                Log.d(Tag, "UnlockActivity database is not null");
-                _database = UnlockActivity.database;
-                sdLog.write("UnlockActivity database is not null".getBytes());
-            }
-            if (_database == null) {
-                Log.e(Tag, "Database is null when initialize HandWriter");
-                sdLog.write("Database is null when initialize HandWriter".getBytes());
-            }
-            if (_database != null && _database.searchTotalCount() > 0) {
-                Log.i(Tag, "Found signature records when initialize HandWriter, reload them");
-                sdLog.write("Found signature records when initialize HandWriter, reload them".getBytes());
-                ArrayList<Signature> signatures = new ArrayList<>();
-                for (int sigId = 0; sigId < 5; ++sigId) {
-                    Cursor cursor = _database.searchBySignatureId(sigId);
-                    ArrayList<Double> T = new ArrayList<>();
-                    ArrayList<Double> X = new ArrayList<>();
-                    ArrayList<Double> Y = new ArrayList<>();
-                    ArrayList<Double> P = new ArrayList<>();
-
-                    if (cursor.moveToFirst()) {
-                        while (cursor.isAfterLast() == false) {
-                            T.add(cursor.getDouble(cursor.getColumnIndex("timestamp")));
-                            X.add(cursor.getDouble(cursor.getColumnIndex("x")));
-                            Y.add(cursor.getDouble(cursor.getColumnIndex("y")));
-                            P.add(cursor.getDouble(cursor.getColumnIndex("y")));
-                            cursor.moveToNext();
-                        }
-                        signatures.add(buildSignature(T, X, Y, P));
+                if (cursor.moveToFirst()) {
+                    while (!cursor.isAfterLast()) {
+                        T.add(cursor.getDouble(cursor.getColumnIndex("timestamp")));
+                        X.add(cursor.getDouble(cursor.getColumnIndex("x")));
+                        Y.add(cursor.getDouble(cursor.getColumnIndex("y")));
+                        P.add(cursor.getDouble(cursor.getColumnIndex("y")));
+                        cursor.moveToNext();
                     }
+                    signatures.add(buildSignature(T, X, Y, P));
                 }
-                _person = new Person(signatures);
             }
-            else {
-                Log.i(Tag, "No signature records in database");
-                sdLog.write("No signature records in database".getBytes());
-            }
+            _person = new Person(signatures);
         }
-        catch (IOException e) {
-            e.printStackTrace();
+        else {
+            Log.i(Tag, "No signature records in database");
         }
-
     }
 
     private Person _person = null;
     private final String Tag = "HandWriter";
     private Database _database = null;
-    public static FileOutputStream sdLog;
 }

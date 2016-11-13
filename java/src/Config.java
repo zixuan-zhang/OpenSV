@@ -38,7 +38,7 @@ public class Config{
 
     public static final String LogPath = "F:\\data\\log\\OpenSV.log";
 
-    public static ArrayList<String> SigComList = new ArrayList<String>(Arrays.asList("X", "Y", "VX", "VY"));
+    public static ArrayList<String> SigComList = new ArrayList<String>(Arrays.asList("X", "Y", "VX", "VY", "P"));
 
     public static int DTWMethod= 1;
 
@@ -70,7 +70,8 @@ public class Config{
 
     public static ArrayList<String> GetFeatureType()
     {
-        return new ArrayList<String>(Arrays.asList(Config.Min, Config.Median, Config.Template));
+        // return new ArrayList<String>(Arrays.asList(Config.Min, Config.Median, Config.Template, Config.Avg, Config.Max));
+        return new ArrayList<String>(Arrays.asList(Config.Min, Config.Template));
     }
 
     public static HashMap<String, ArrayList<String>> FeatureType = new HashMap<String, ArrayList<String>>(){

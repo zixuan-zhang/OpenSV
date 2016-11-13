@@ -13,6 +13,7 @@ public class ViewCompat {
      * @param view the view
      * @return true if this view has been through at least one layout since it was last attached to or detached from a window.
      */
+
     public static boolean isLaidOut(View view) {
         // Future (API19+)...
         if (Build.VERSION.SDK_INT >= 19) {

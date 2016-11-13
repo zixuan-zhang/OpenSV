@@ -24,6 +24,7 @@ public class Program {
         catch (Exception e)
         {
             Utils.logger.log(Level.INFO, "Exception when running : {0}", e.toString());
+            e.printStackTrace();
         }
     }
 

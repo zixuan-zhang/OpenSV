@@ -7,16 +7,11 @@ package cn.ac.iscas.handwriter.utils;
 /**
  * Created by zixuan on 2016/9/1.
  */
-import java.io.IOException;
-import java.text.SimpleDateFormat;
+
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Date;
-import java.util.logging.FileHandler;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.List;
-import java.util.logging.SimpleFormatter;
 
 public class Utils {
     public static final Logger logger = Logger.getLogger("OpenSV");
@@ -70,34 +65,6 @@ public class Utils {
             _min = Math.min(_min, nums.get(i));
         return _min;
     }
-
-    public static Boolean Init()
-    {
-        try
-        {
-            Date date = new Date();
-            SimpleDateFormat df = new SimpleDateFormat("MMddHHmmss");
-            String postFix = df.format(date);
-            FileHandler fh = new FileHandler(Config.LogPath + "." + postFix);
-            Utils.logger.addHandler(fh);
-            SimpleFormatter formatter = new SimpleFormatter();
-            fh.setFormatter(formatter);
-            return Boolean.TRUE;
-        }
-        catch (IOException e)
-        {
-            Utils.logger.log(Level.INFO, "Error: when create file handler {0}", e.toString());
-            return Boolean.FALSE;
-        }
-    }
-
-    /*
-    public Boolean Final()
-    {
-        Utils.logger.removeHandler(fh);
-        return Boolean.TRUE;
-    }
-    */
 }
 
 

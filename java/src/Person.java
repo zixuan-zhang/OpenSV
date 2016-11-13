@@ -64,6 +64,7 @@ public class Person {
             ArrayList<Double> maxComList = new ArrayList<>();
             ArrayList<Double> minComList = new ArrayList<>();
             ArrayList<Double> avgComList = new ArrayList<>();
+            ArrayList<Double> medComList = new ArrayList<>();
 
             for (int i = 0; i < this.GetRefCount(); ++i)
             {
@@ -84,6 +85,7 @@ public class Person {
                 maxComList.add(Utils.GetMaxValue(comDisList));
                 minComList.add(Utils.GetMinValue(comDisList));
                 avgComList.add(Utils.GetMeanValue(comDisList));
+                medComList.add(Utils.GetMedianValue(comDisList));
             }
             if (Config.FeatureType.get(com).indexOf(Config.Template) != -1)
                 this.baseValueMap.put(Config.Template+com, Utils.GetMeanValue(templateComList));
@@ -94,7 +96,7 @@ public class Person {
             if (Config.FeatureType.get(com).indexOf(Config.Avg) != -1)
                 this.baseValueMap.put(Config.Avg+com, Utils.GetMeanValue(avgComList));
             if (Config.FeatureType.get(com).indexOf(Config.Median) != -1)
-                this.baseValueMap.put(Config.Median+com, Utils.GetMedianValue(avgComList));
+                this.baseValueMap.put(Config.Median+com, Utils.GetMeanValue(medComList));
             /*
             Utils.logger.log(Level.INFO, "Calculating signal: {0} {1} {2} {3} {4}",
                     new Object[]{com,
