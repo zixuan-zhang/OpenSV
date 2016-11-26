@@ -1,3 +1,10 @@
+## 2016.11.26
+1. 今天整理了新的10个人的数据，然后做实验，效果下降了很多。RandomForest, (X, Y, VX, VY, P), Method=1, (Min, Temp) 组合得到0.979, 0.87, 0.925
+2. RandomForest, (X, Y, VX, VY, P), Method=1, (Min, Med, Temp)组合得到0.979, 0.90, 0.945
+3. RandomForest, (X, Y, VX, VY), Method=1, (Min, Med, Temp) 得到0.962, 0.933, 0.945
+4. RandomForest, (X, Y, VX, VY), Method=1, (Min, Med, Avg) 得到0.972, 0.926, 0.949
+5. RandomForest, (X, Y, VY), Method=1, (Min, Med, Avg)得到0.962, 0.944, 0.953。和30个人的结果相持平。
+
 ## 2016.11.24
 1. 宋佳钰同学帮忙采集了10个人的真实签名
 2. 复现paper里面的算法，得到了2.0%的准确率，接近论文里提出的结果
