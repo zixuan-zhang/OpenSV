@@ -219,6 +219,49 @@ def draw_susig():
     #plt.plot(range(len(X3)), X3, "r")
     plt.show()
 
+def get_data_from_self_file(fileName):
+    T = []
+    X = []
+    Y = []
+    P = []
+    with open(fileName) as fp:
+        lines = fp.readlines()
+        for line in lines:
+            if not line.strip():
+                continue
+            items = line.strip().split()
+            T.append(float(items[0]))
+            X.append(float(items[1]))
+            Y.append(float(items[2]))
+            P.append(float(items[3]))
+    if len(T) > 0:
+        T = [t - T[0] for t in T]
+    return T, X, Y, P
+
+def compare_self_x_axis():
+    file1 = "/home/zixuan/workspace/OpenSV/data/self/genuines/001_001"
+    file2 = "/home/zixuan/workspace/OpenSV/data/self/genuines/001_002"
+    file3 = "/home/zixuan/workspace/OpenSV/data/self/forgeries/001_010"
+
+    T1, X1, Y1, P1 = get_data_from_self_file(file1)
+    T2, X2, Y2, P2 = get_data_from_self_file(file2)
+    T3, X3, Y3, P3 = get_data_from_self_file(file3)
+
+
+    fig, ax = plt.subplots()
+    ax.plot(range(len(X1)), X1, "k--", label="Genuine Signature 1")
+    ax.plot(range(len(X2)), X2, "k:", label="Genuine Signature 2")
+    ax.plot(range(len(X3)), X3, "k", label="Forgery Signature")
+
+    legend = ax.legend(loc="upper left", shadow=True)
+    frame = legend.get_frame()
+    frame.set_facecolor("0.90")
+
+    plt.xlabel("Time")
+    plt.ylabel("X axis")
+
+    plt.show()
+
 def test():
     fileName = "/home/zixuan/workspace/OpenSV/data/self/genuines/001_000"
     X, Y = get_x_y_from_self_file(fileName)
@@ -230,5 +273,8 @@ def test():
     plt.show()
 
 if __name__ == "__main__":
-    draw_self("forgeries")
-    # test()
+    # draw_self("forgeries")
+    # draw_self("genuines")
+    #test()
+    # draw_susig()
+    compare_self_x_axis()
