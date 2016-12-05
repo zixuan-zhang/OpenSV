@@ -10,7 +10,9 @@ import traceback
 from sklearn import svm
 from sklearn import tree
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestRegressor
 from sklearn.ensemble import GradientBoostingClassifier
+from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.decomposition import PCA
 from sklearn.linear_model import LogisticRegression
 
@@ -25,6 +27,9 @@ LOGGER = logging.getLogger()
 
 LOGGER.info("This one use validation sets, with session2")
 
+MODE = "Normal"
+LOGGER.info("Mode: %s" % MODE)
+
 """
 Singature Component:
     'X': x axis
@@ -36,11 +41,8 @@ Singature Component:
     'AY': acceleration of y axis
 """
 
-USE_PCA = False
-LinearClassifier = "LogisticRegression"
-
-LOGGER.info("USE_PCA: %s" % USE_PCA)
-LOGGER.info("Linear classifier is %s" % LinearClassifier)
+ClassifyOrRegression = "Regression"
+LOGGER.info("ClassifyOrRegression: %s" % ClassifyOrRegression)
 
 # Signal list which need to be considered
 SigCompList = ["VX", "VY", "P"]
@@ -83,9 +85,10 @@ THRESHOLD = {
 
 # Data settings
 
-TRAIN_SET_COUNT = 50
+TRAIN_SET_COUNT = 10
 REF_COUNT = 5
 CLASSIFIER = "RFC" # "RFC", "GBC", "SVM", "MLP", "Logi"
+REGRESSOR = "PCA" # RFR, LOG, "GBR", PCA
 
 # Random Forest Tree settings
 MAX_DEPTH = 3
@@ -303,11 +306,9 @@ class PersonTraining(Person):
 
         return genuineVec, forgeryVec
 
-class Driver():
+class BaseDriver(object):
     def __init__(self):
-
         self.processor = processor.PreProcessor()
-
         trainSets, testSets = self.get_signatures_from_susig()
         self.train_set = trainSets
         self.test_set = testSets
@@ -321,52 +322,6 @@ class Driver():
 
         self.pca = PCA(n_components=1)
 
-
-        if CLASSIFIER == "SVM":
-            self.svm = svm.SVC()
-        elif CLASSIFIER == "GBC":
-            self.svm = GradientBoostingClassifier(n_estimators=300, max_depth=5, learning_rate=0.05)
-        elif CLASSIFIER == "RFC":
-            # self.svm = RandomForestClassifier(n_estimators=N_ESTIMATORS, n_jobs=N_JOBS,
-                # max_features = MAX_FEATURES, min_samples_leaf = MIN_SAMPLES_LEAF, max_depth=MAX_DEPTH)
-            self.svm = RandomForestClassifier(n_estimators=N_ESTIMATORS, n_jobs=N_JOBS)
-
-        if USE_PCA and LinearClassifier == "LogisticRegression":
-            self.svm = LogisticRegression()
-        elif USE_PCA:
-            self.svm = svm.SVC()
-
-        genuineX = []
-        forgeryX = []
-
-        genuineY = []
-        forgeryY = []
-
-        # Training process
-        for sigs in self.train_set:
-            personTrain = PersonTraining(sigs)
-            genuine, forgery = personTrain.calc_train_set()
-            genuineX.extend(genuine)
-            forgeryX.extend(forgery)
-
-        genuineY = [1] * len(genuineX)
-        forgeryY = [0] * len(forgeryX)
-
-        genuineCount = len(genuineX)
-        trainX = genuineX + forgeryX
-        if USE_PCA:
-            trainX = self.pca.fit_transform(trainX)
-
-            pcaGenuine = trainX[:genuineCount]
-            pcaForgery = trainX[genuineCount:]
-            for pcaG in pcaGenuine:
-                LOGGER.info("Genuine PCA %s" % pcaG)
-            for pcaF in pcaForgery:
-                LOGGER.info("Forgery PCA %s" % pcaF)
-
-        trainY = genuineY + forgeryY
-
-        self.svm.fit(trainX, trainY)
 
     def pre_process_for_signle_signature(self, signature):
         RX = signature[0]
@@ -482,13 +437,52 @@ class Driver():
         print "test set genuine count: %d" % len(testSets[0]["genuine"])
         print "test set forgery count: %d" % len(testSets[0]["forgery"])
         """
-        # return trainSets[:70], trainSets[70:] + testSets
-        return testSets+trainSets[0:TRAIN_SET_COUNT-10], trainSets[TRAIN_SET_COUNT-10:]
-        # return testSets, trainSets
+
+        if MODE == "TEST":
+            return testSets[:2], trainSets[:2]
+        else:
+            return testSets+trainSets[0:TRAIN_SET_COUNT-10], trainSets[TRAIN_SET_COUNT-10:]
 
     def calculate_delta(self, valueList):
         deltaValueList = [valueList[i] - valueList[i-1] for i in range(1, len(valueList))]
         return deltaValueList
+
+    def test(self):
+        pass
+
+class ClassifyDriver(BaseDriver):
+    def __init__(self):
+        super(ClassifyDriver, self).__init__()
+
+        if CLASSIFIER == "SVM":
+            self.driver = svm.SVC()
+        elif CLASSIFIER == "GBC":
+            self.driver = GradientBoostingClassifier(n_estimators=300, max_depth=5, learning_rate=0.05)
+        elif CLASSIFIER == "RFC":
+            self.driver = RandomForestClassifier(n_estimators=N_ESTIMATORS, n_jobs=N_JOBS)
+        else:
+            raise Exception("Classifier %s not supported" % CLASSIFIER)
+
+        genuineX = []
+        forgeryX = []
+
+        genuineY = []
+        forgeryY = []
+
+        # Training process
+        for sigs in self.train_set:
+            personTrain = PersonTraining(sigs)
+            genuine, forgery = personTrain.calc_train_set()
+            genuineX.extend(genuine)
+            forgeryX.extend(forgery)
+
+        genuineY = [1] * len(genuineX)
+        forgeryY = [0] * len(forgeryX)
+
+        trainX = genuineX + forgeryX
+        trainY = genuineY + forgeryY
+
+        self.driver.fit(trainX, trainY)
 
     def test(self):
         LOGGER.info("Start test")
@@ -515,10 +509,7 @@ class Driver():
             for j in range(len(genuine_set)):
                 sig = genuine_set[j]
                 dis = personTest.calc_dis(sig)
-                if USE_PCA:
-                    dis = self.pca.transform(dis)
-                    genuine_test_dis.append(dis.tolist()[0][0])
-                res = self.svm.predict(dis)
+                res = self.driver.predict(dis)
                 LOGGER.info("Genuine Test: Result: %s, %s" % (res, dis))
                 genuine_test_result.append(res)
                 if (res != 1):
@@ -527,10 +518,7 @@ class Driver():
             for j in range(len(forgery_set)):
                 sig = forgery_set[j]
                 dis = personTest.calc_dis(sig)
-                if USE_PCA:
-                    dis = self.pca.transform(dis)
-                    forgery_test_dis.append(dis.tolist()[0][0])
-                res = self.svm.predict(dis)
+                res = self.driver.predict(dis)
                 LOGGER.info("Forgery Test: Result: %s, %s" % (res, dis))
                 forgery_test_result.append(res)
                 if (res != 0):
@@ -551,10 +539,7 @@ class Driver():
                 for j in range(len(random_set)):
                     sig = random_set[j]
                     dis = personTest.calc_dis(sig)
-                    if USE_PCA:
-                        dis = self.pca.transform(dis)
-                        forgery_test_dis.append(dis.tolist()[0][0])
-                    res = self.svm.predict(dis)
+                    res = self.driver.predict(dis)
                     LOGGER.info("Random Test: Result: %s, %s" % (res, dis))
                     random_test_result.append(res)
                     if (res != 0):
@@ -574,39 +559,180 @@ class Driver():
             LOGGER.info("false accepted rate: %f" % (1 - sum(random_test_result) / float(len(random_test_result))))
 
 
-        if USE_PCA:
-            # Compute Equal Error Rate
-            genuine_test_dis_list = sorted(genuine_test_dis, reverse=True) # desending order
-            forgery_test_dis_list = sorted(forgery_test_dis) # asending order
+class RegressionDriver(BaseDriver):
+    def __init__(self):
+        super(RegressionDriver, self).__init__()
 
-            lastGap = 100.0
-            genuineCount = len(genuine_test_dis_list)
-            forgeryCount = len(forgery_test_dis_list)
-            falseRejectRate = None
-            falseAcceptRate = None
-            for i in range(genuineCount):
-                pivotal = genuine_test_dis_list[i]
-                falseRejectRate = float(i) / genuineCount
-                j = 0
-                while j < forgeryCount and forgery_test_dis_list[j] <= pivotal:
-                    j += 1
-                falseAcceptRate = float(j) / forgeryCount
-                gap = abs(falseAcceptRate - falseRejectRate)
-                if gap == 0.0:
-                    break;
-                elif gap < lastGap:
-                    lastGap = gap
+        if REGRESSOR == "LOG":
+            self.driver = LogisticRegression()
+        elif REGRESSOR == "RFR":
+            self.driver = RandomForestRegressor(n_estimators=N_ESTIMATORS, n_jobs=N_JOBS)
+        elif REGRESSOR == "GBR":
+            self.driver = GradientBoostingClassifier(n_estimators=300, max_depth=5, learning_rate=0.05)
+        elif REGRESSOR == "PCA":
+            self.driver = PCA(n_components=1)
+        else:
+            raise Exception("Regressor: %s not supported." % REGRESSOR)
+
+        genuineX = []
+        forgeryX = []
+
+        genuineY = []
+        forgeryY = []
+
+        # Training process
+        for sigs in self.train_set:
+            personTrain = PersonTraining(sigs)
+            genuine, forgery = personTrain.calc_train_set()
+            genuineX.extend(genuine)
+            forgeryX.extend(forgery)
+
+        genuineY = [1.0] * len(genuineX)
+        forgeryY = [0.0] * len(forgeryX)
+
+        trainX = genuineX + forgeryX
+        trainY = genuineY + forgeryY
+
+        self.driver.fit(trainX, trainY)
+
+    def test(self):
+        LOGGER.info("Start test")
+        count = 1
+        test_set = self.test_set
+        if TRAIN_SET_INCLUDE:
+            test_set.extend(self.train_set)
+        forgery_test_result = []
+        genuine_test_result = []
+        random_test_result = []
+
+        genuine_test_dis = []
+        forgery_test_dis = []
+
+        falseRejectCount = 0
+        falseAcceptSkillCount = 0
+        falseAcceptRandomCount = 0
+
+        for i in range(len(test_set)):
+            one_test_set = test_set[i]
+            LOGGER.info("Test signature: %d" % count)
+            count += 1
+            personTest = PersonTest(one_test_set["genuine"][0:REF_COUNT])
+            genuine_set = one_test_set["genuine"][REF_COUNT:]
+            forgery_set = one_test_set["forgery"]
+            random_set = []
+
+            for j in range(len(genuine_set)):
+                sig = genuine_set[j]
+                dis = personTest.calc_dis(sig)
+                if REGRESSOR == "PCA":
+                    res = self.driver.transform(dis)
+                    res = res.tolist()[0][0]
                 else:
-                    break
-            LOGGER.info("falseRejectRate: %f, falseAcceptRate: %f" % (falseRejectRate, falseAcceptRate))
+                    res = self.driver.predict(dis)
+                    res = res.tolist()[0]
+                genuine_test_dis.append(res)
+                LOGGER.info("Genuine Test: Result: %s, %s" % (res, dis))
+                genuine_test_result.append(res)
+                if (res < 0.5):
+                    LOGGER.fatal("FalseReject: uid: %d, sid: %d" % (i, j))
+                    falseRejectCount += 1
 
-            LOGGER.info("TestResultGenuine : %s" % genuine_test_dis)
-            LOGGER.info("TestResultForgery : %s" % forgery_test_dis)
+            for j in range(len(forgery_set)):
+                sig = forgery_set[j]
+                dis = personTest.calc_dis(sig)
+                if REGRESSOR == "PCA":
+                    res = self.driver.transform(dis)
+                    res = res.tolist()[0][0]
+                else:
+                    res = self.driver.predict(dis)
+                    res = res.tolist()[0]
+                forgery_test_dis.append(res)
+                LOGGER.info("Forgery Test: Result: %s, %s" % (res, dis))
+                forgery_test_result.append(res)
+                if (res >= 0.5):
+                    LOGGER.fatal("FalseAccept: uid: %d, sid: %d" % (i, j))
+                    falseAcceptSkillCount += 1
+
+            if RANDOM_FORGERY_INCLUDE:
+                for j in range(len(test_set)):
+                    if i == j:
+                        continue
+                    random_set.extend(test_set[j]["genuine"])
+                    random_set.extend(test_set[j]["forgery"])
+
+                # train set included
+                for one_train_set in self.train_set:
+                    random_set.extend(one_train_set["genuine"])
+                    random_set.extend(one_train_set["forgery"])
+
+                for j in range(len(random_set)):
+                    sig = random_set[j]
+                    dis = personTest.calc_dis(sig)
+                    if REGRESSOR == "PCA":
+                        res = self.driver.transform(dis)
+                        res = res.tolist()[0][0]
+                    else:
+                        res = self.driver.predict(dis)
+                        res = res.tolist()[0]
+                    forgery_test_dis.append(res)
+                    LOGGER.info("Random Test: Result: %s, %s" % (res, dis))
+                    random_test_result.append(res)
+                    if (res >= 0.5):
+                        LOGGER.fatal("FalseAccept: uid: %d, sig: %d" % (i, j))
+                        falseAcceptRandomCount += 1
+
+        LOGGER.info("genuine test set count: %d" % len(genuine_test_result))
+        LOGGER.info("false reject count: %d" % falseRejectCount)
+        LOGGER.info("false rejected rate: %f" % (float(falseRejectCount) / float(len(genuine_test_result))))
+
+        LOGGER.info("forgery test set count: %d" % len(forgery_test_result))
+        LOGGER.info("false accepted count: %d" % falseAcceptSkillCount)
+        LOGGER.info("false accepted rate: %f" % (float(falseAcceptSkillCount) / float(len(forgery_test_result))))
+
+        if RANDOM_FORGERY_INCLUDE:
+            LOGGER.info("random test set count: %d" % len(random_test_result))
+            LOGGER.info("false accepted count: %d" % falseAcceptRandomCount)
+            LOGGER.info("false accepted rate: %f" % (float(falseAcceptRandomCount) / float(len(random_test_result))))
+
+        # Compute Equal Error Rate
+        genuine_test_dis_list = sorted(genuine_test_dis) # desending order
+        forgery_test_dis_list = sorted(forgery_test_dis, reverse=True) # asending order
+
+        if REGRESSOR == "PCA":
+            genuine_test_dis_list = [-1 * v for v in genuine_test_dis_list]
+            forgery_test_dis_list = [-1 * v for v in forgery_test_dis_list]
+
+        lastGap = 100.0
+        genuineCount = len(genuine_test_dis_list)
+        forgeryCount = len(forgery_test_dis_list)
+        falseRejectRate = None
+        falseAcceptRate = None
+        for i in range(genuineCount):
+            pivotal = genuine_test_dis_list[i]
+            falseRejectRate = float(i) / genuineCount
+            j = 0
+            while j < forgeryCount and forgery_test_dis_list[j] >= pivotal:
+                j += 1
+            falseAcceptRate = float(j) / forgeryCount
+            gap = abs(falseAcceptRate - falseRejectRate)
+            if gap == 0.0:
+                break;
+            elif gap < lastGap:
+                lastGap = gap
+            else:
+                break
+        LOGGER.info("falseRejectRate: %f, falseAcceptRate: %f, gap: %f" % (falseRejectRate, falseAcceptRate, lastGap))
+        LOGGER.info("TestResultGenuine : %s" % genuine_test_dis)
+        LOGGER.info("TestResultForgery : %s" % forgery_test_dis)
 
 def test_DTW():
     start = time.time()
-    driver = Driver()
-    driver.test()
+    if ClassifyOrRegression == "Classify":
+        driver = ClassifyDriver()
+        driver.test()
+    else:
+        driver = RegressionDriver()
+        driver.test()
     end = time.time()
     LOGGER.info("Total time : %f" % (end - start))
 
