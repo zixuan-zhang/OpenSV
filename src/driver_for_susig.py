@@ -13,6 +13,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.ensemble import GradientBoostingRegressor
+# from sklearn.neural_network import MLPRegressor
 from sklearn.decomposition import PCA
 from sklearn.linear_model import LogisticRegression
 
@@ -88,7 +89,7 @@ THRESHOLD = {
 TRAIN_SET_COUNT = 10
 REF_COUNT = 5
 CLASSIFIER = "RFC" # "RFC", "GBC", "SVM", "MLP", "Logi"
-REGRESSOR = "PCA" # RFR, LOG, "GBR", PCA
+REGRESSOR = "LOG" # RFR, LOG, "GBR", PCA, MLP
 
 # Random Forest Tree settings
 MAX_DEPTH = 3
@@ -110,6 +111,7 @@ LOGGER.info("MultiSession: %s" % MULTI_SESSION)
 LOGGER.info("SizeNormalizationSwitch: %s" % SIZE_NORM_SWITCH)
 LOGGER.info("RandomForgeryInclude: %s" % RANDOM_FORGERY_INCLUDE)
 LOGGER.info("ClassifierType: %s" % CLASSIFIER)
+LOGGER.info("REGRESSOR: %s" % REGRESSOR)
 LOGGER.info("LocalNormalizationType: %s" % LOCAL_NORMAL_TYPE)
 LOGGER.info("Reference Count: %d" % REF_COUNT)
 LOGGER.info("Method: %d" % METHOD)
@@ -587,8 +589,9 @@ class RegressionDriver(BaseDriver):
             genuineX.extend(genuine)
             forgeryX.extend(forgery)
 
-        genuineY = [1.0] * len(genuineX)
-        forgeryY = [0.0] * len(forgeryX)
+        # To adjust PCA result, 0 means genuine and 1 means forgery
+        genuineY = [0.0] * len(genuineX)
+        forgeryY = [1.0] * len(forgeryX)
 
         trainX = genuineX + forgeryX
         trainY = genuineY + forgeryY
@@ -633,7 +636,7 @@ class RegressionDriver(BaseDriver):
                 genuine_test_dis.append(res)
                 LOGGER.info("Genuine Test: Result: %s, %s" % (res, dis))
                 genuine_test_result.append(res)
-                if (res < 0.5):
+                if (res > 0.5):
                     LOGGER.fatal("FalseReject: uid: %d, sid: %d" % (i, j))
                     falseRejectCount += 1
 
@@ -649,7 +652,7 @@ class RegressionDriver(BaseDriver):
                 forgery_test_dis.append(res)
                 LOGGER.info("Forgery Test: Result: %s, %s" % (res, dis))
                 forgery_test_result.append(res)
-                if (res >= 0.5):
+                if (res <= 0.5):
                     LOGGER.fatal("FalseAccept: uid: %d, sid: %d" % (i, j))
                     falseAcceptSkillCount += 1
 
@@ -677,7 +680,7 @@ class RegressionDriver(BaseDriver):
                     forgery_test_dis.append(res)
                     LOGGER.info("Random Test: Result: %s, %s" % (res, dis))
                     random_test_result.append(res)
-                    if (res >= 0.5):
+                    if (res <= 0.5):
                         LOGGER.fatal("FalseAccept: uid: %d, sig: %d" % (i, j))
                         falseAcceptRandomCount += 1
 
@@ -695,12 +698,8 @@ class RegressionDriver(BaseDriver):
             LOGGER.info("false accepted rate: %f" % (float(falseAcceptRandomCount) / float(len(random_test_result))))
 
         # Compute Equal Error Rate
-        genuine_test_dis_list = sorted(genuine_test_dis) # desending order
-        forgery_test_dis_list = sorted(forgery_test_dis, reverse=True) # asending order
-
-        if REGRESSOR == "PCA":
-            genuine_test_dis_list = [-1 * v for v in genuine_test_dis_list]
-            forgery_test_dis_list = [-1 * v for v in forgery_test_dis_list]
+        genuine_test_dis_list = sorted(genuine_test_dis, reverse=True) # desending order
+        forgery_test_dis_list = sorted(forgery_test_dis) # asending order
 
         lastGap = 100.0
         genuineCount = len(genuine_test_dis_list)
@@ -711,7 +710,7 @@ class RegressionDriver(BaseDriver):
             pivotal = genuine_test_dis_list[i]
             falseRejectRate = float(i) / genuineCount
             j = 0
-            while j < forgeryCount and forgery_test_dis_list[j] >= pivotal:
+            while j < forgeryCount and forgery_test_dis_list[j] <= pivotal:
                 j += 1
             falseAcceptRate = float(j) / forgeryCount
             gap = abs(falseAcceptRate - falseRejectRate)
