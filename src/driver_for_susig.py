@@ -5,11 +5,17 @@ import time
 import logging
 import numpy
 import datetime
+import traceback
 
 from sklearn import svm
 from sklearn import tree
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestRegressor
 from sklearn.ensemble import GradientBoostingClassifier
+from sklearn.ensemble import GradientBoostingRegressor
+# from sklearn.neural_network import MLPRegressor
+from sklearn.decomposition import PCA
+from sklearn.linear_model import LogisticRegression
 
 import utils
 import processor
@@ -19,6 +25,11 @@ FILENAME = datetime.datetime.now().strftime("%Y%m%d%H%M%S.log")
 FORMAT = '%(asctime)s %(levelname)s %(name)s %(message)s'
 logging.basicConfig(filename = "%s/%s" % (FOLDER, FILENAME), level = logging.INFO, format = FORMAT)
 LOGGER = logging.getLogger()
+
+LOGGER.info("This one use validation sets, with session2")
+
+MODE = "Normal"
+LOGGER.info("Mode: %s" % MODE)
 
 """
 Singature Component:
@@ -30,52 +41,60 @@ Singature Component:
     'AX': acceleration of x axis
     'AY': acceleration of y axis
 """
+
+ClassifyOrRegression = "Regression"
+LOGGER.info("ClassifyOrRegression: %s" % ClassifyOrRegression)
+
 # Signal list which need to be considered
-SigCompList = ["Y", "VX", "VY"]
+SigCompList = ["VX", "VY", "P"]
+
+# Feature settings
+FEATURE_TYPE = {
+        "VX": ["template", "min", "avg"],
+        "VY": ["template", "min", "avg"],
+        "P": ["template", "min", "avg"],
+        "X": ["template", "med", "min", "avg"],
+        "Y": ["template", "med", "min", "avg"],
+        "VP": ["template", "min", "avg"],
+        "AX": ["template", "min", "avg"],
+        "AY": ["template", "min", "avg"],
+        }
+LOGGER.info("FEATURE_TYPE: %s" % FEATURE_TYPE)
 
 # DTW settings
 METHOD = 2
 PENALIZATION = {
         "X": 7,
-        "Y": 7,
-        "VX": 6,
-        "VY": 6,
-        "P": 7,
+        "Y": 5,
+        "VX": 3,
+        "VY": 2,
+        "P": 2,
         "VP": 2,
-        "AX": 7,
-        "AY": 7,
+        "AX": 3,
+        "AY": 3,
         }
 THRESHOLD = {
-        "X": 2,
-        "Y": 2,
-        "VX": 2,
-        "VY": 0,
-        "P": 3,
+        "X": 8,
+        "Y": 6,
+        "VX": 0,
+        "VY": 1,
+        "P": 2,
         "VP": 0,
-        "AX": 1,
-        "AY": 1,
+        "AX": 4,
+        "AY": 3,
         }
 
-# Feature settings
-FEATURE_TYPE = {
-        "X": ["template", "min", "avg"],
-        "Y": ["template", "min", "avg"],
-        "VX": ["template","min", "avg"],
-        "VY": ["template","min", "avg"],
-        "P": ["template", "min", "avg"],
-        "VP": ["template", "min", "avg"],
-        "AX": ["template", "min", "avg"],
-        "AY": ["template", "min", "avg"],
-        }
 # Data settings
 
-REF_COUNT = 3
-CLASSIFIER = "RFC" # "RFC", "GBC", "SVM", "MLP"
+TRAIN_SET_COUNT = 10
+REF_COUNT = 5
+CLASSIFIER = "RFC" # "RFC", "GBC", "SVM", "MLP", "Logi"
+REGRESSOR = "LOG" # RFR, LOG, "GBR", PCA, MLP
 
 # Random Forest Tree settings
 MAX_DEPTH = 3
 MAX_FEATURES = None
-N_ESTIMATORS = 300
+N_ESTIMATORS = 200
 MIN_SAMPLES_LEAF = 1
 N_JOBS = 1
 
@@ -83,17 +102,22 @@ LOCAL_NORMAL_TYPE = "mid" # "mid" or "offset"
 RANDOM_FORGERY_INCLUDE = False
 TRAIN_SET_INCLUDE = False
 SIZE_NORM_SWITCH = True
+MULTI_SESSION = True
+PRE_PROCESSOR_SWITCH = True
 
+LOGGER.info("PreProcessorSwitch: %s" % PRE_PROCESSOR_SWITCH)
+LOGGER.info("TrainSetCount: %s" % TRAIN_SET_COUNT)
+LOGGER.info("MultiSession: %s" % MULTI_SESSION)
 LOGGER.info("SizeNormalizationSwitch: %s" % SIZE_NORM_SWITCH)
 LOGGER.info("RandomForgeryInclude: %s" % RANDOM_FORGERY_INCLUDE)
 LOGGER.info("ClassifierType: %s" % CLASSIFIER)
+LOGGER.info("REGRESSOR: %s" % REGRESSOR)
 LOGGER.info("LocalNormalizationType: %s" % LOCAL_NORMAL_TYPE)
 LOGGER.info("Reference Count: %d" % REF_COUNT)
 LOGGER.info("Method: %d" % METHOD)
 LOGGER.info("Signal List: %s" % SigCompList)
 LOGGER.info("PENALIZATION: %s" % PENALIZATION)
 LOGGER.info("THRESHOLD: %s" % THRESHOLD)
-LOGGER.info("FEATURE_TYPE: %s" % FEATURE_TYPE)
 LOGGER.info("RandomForestTree: max_feature: %s, n_estimator: %d, min_sample_leaf: %d, n_jobs: %d, max_depth: %d" %
         (MAX_FEATURES, N_ESTIMATORS, MIN_SAMPLES_LEAF, N_JOBS, MAX_DEPTH))
 
@@ -164,10 +188,11 @@ class Person(object):
                     comDisList.append(naive_dtw(signal1, signal2, PENALIZATION[com], THRESHOLD[com]))
                 dis += numpy.mean(comDisList)
             refDis.append(dis)
-        templateIndex = refDis.index(min(refDis))
-        LOGGER.info("template index : %d. RefSigDisList: %s" % (templateIndex, refDis))
-        self.templateSig = self.refSigs.pop(templateIndex)
-        self.refCount -= 1
+
+        self.templateIndex = refDis.index(min(refDis))
+        LOGGER.info("template index : %d. RefSigDisList: %s" % (self.templateIndex, refDis))
+        self.templateSig = self.refSigs[self.templateIndex]
+
 
     def calc_base_dis(self):
         """
@@ -181,7 +206,10 @@ class Person(object):
             maxComList = []
             minComList = []
             avgComList = []
+            medComList = []
             for i in range(self.refCount):
+                if i == self.templateIndex:
+                    continue
                 comi = self.refSigs[i][com]
                 templateComDis = naive_dtw(comi, self.templateSig[com], PENALIZATION[com], THRESHOLD[com])
                 templateComList.append(templateComDis)
@@ -190,10 +218,11 @@ class Person(object):
                     if i == j:
                         continue
                     comj = self.refSigs[j][com]
-                    comDisList.append(naive_dtw(comi, comj))
+                    comDisList.append(naive_dtw(comi, comj, PENALIZATION[com], THRESHOLD[com]))
                 maxComList.append(max(comDisList))
                 minComList.append(min(comDisList))
                 avgComList.append(numpy.mean(comDisList))
+                medComList.append(numpy.median(comDisList))
             if "template" in FEATURE_TYPE[com]:
                 self.base["template" + com] = numpy.mean(templateComList)
             if "max" in FEATURE_TYPE[com]:
@@ -202,6 +231,8 @@ class Person(object):
                 self.base["min"+com] = numpy.mean(minComList)
             if "avg" in FEATURE_TYPE[com]:
                 self.base["avg"+com] = numpy.mean(avgComList)
+            if "med" in FEATURE_TYPE[com]:
+                self.base["med"+com] = numpy.mean(medComList)
             LOGGER.info("Calculating signal: %s. %s" % (com, ", ".join(["%s:%s"%(items[0], items[1]) for items in self.base.items()])))
 
     def calc_dis(self, signature):
@@ -221,6 +252,7 @@ class Person(object):
             maxComDis = max(comDisList)
             minComDis = min(comDisList)
             avgComDis = numpy.mean(comDisList)
+            medComDis = numpy.median(comDisList)
             if "template" in FEATURE_TYPE[com]:
                 featureVec.append(templateComDis / self.base["template"+com])
             if "max" in FEATURE_TYPE[com]:
@@ -229,6 +261,9 @@ class Person(object):
                 featureVec.append(minComDis / self.base["min"+com])
             if "avg" in FEATURE_TYPE[com]:
                 featureVec.append(avgComDis / self.base["avg"+com])
+            if "med" in FEATURE_TYPE[com]:
+                featureVec.append(medComDis / self.base["med"+com])
+            
         return featureVec
 
 class PersonTest(Person):
@@ -273,11 +308,9 @@ class PersonTraining(Person):
 
         return genuineVec, forgeryVec
 
-class Driver():
+class BaseDriver(object):
     def __init__(self):
-
         self.processor = processor.PreProcessor()
-
         trainSets, testSets = self.get_signatures_from_susig()
         self.train_set = trainSets
         self.test_set = testSets
@@ -289,46 +322,20 @@ class Driver():
         LOGGER.info("Genuine count in test set : %d" % len(testSets[0]["genuine"]))
         LOGGER.info("Forgery count in test set : %d" % len(testSets[0]["forgery"]))
 
+        self.pca = PCA(n_components=1)
 
-        if CLASSIFIER == "SVM":
-            self.svm = svm.SVC()
-        elif CLASSIFIER == "GBC":
-            self.svm = GradientBoostingClassifier(n_estimators=300, max_depth=5, learning_rate=0.05)
-        elif CLASSIFIER == "RFC":
-            # self.svm = RandomForestClassifier(n_estimators=N_ESTIMATORS, n_jobs=N_JOBS,
-                # max_features = MAX_FEATURES, min_samples_leaf = MIN_SAMPLES_LEAF, max_depth=MAX_DEPTH)
-            self.svm = RandomForestClassifier(n_estimators=N_ESTIMATORS, n_jobs=N_JOBS)
-
-        genuineX = []
-        forgeryX = []
-
-        genuineY = []
-        forgeryY = []
-
-        # Training process
-        for sigs in self.train_set:
-            personTrain = PersonTraining(sigs)
-            genuine, forgery = personTrain.calc_train_set()
-            genuineX.extend(genuine)
-            forgeryX.extend(forgery)
-
-        genuineY = [1] * len(genuineX)
-        forgeryY = [0] * len(forgeryX)
-        trainX = genuineX + forgeryX
-        trainY = genuineY + forgeryY
-
-        self.svm.fit(trainX, trainY)
 
     def pre_process_for_signle_signature(self, signature):
         RX = signature[0]
         RY = signature[1]
         P  = signature[2]
-        if SIZE_NORM_SWITCH:
-            RX, RY = self.processor.size_normalization(RX, RY, 400, 200)
-        if LOCAL_NORMAL_TYPE == "mid":
-            RX, RY = self.processor.location_normalization(RX, RY)
-        elif LOCAL_NORMAL_TYPE == "offset":
-            RX, RY = self.processor.offset_to_origin_normalization(RX, RY)
+        if PRE_PROCESSOR_SWITCH:
+            if SIZE_NORM_SWITCH:
+                RX, RY = self.processor.size_normalization(RX, RY, 400, 200)
+            if LOCAL_NORMAL_TYPE == "mid":
+                RX, RY = self.processor.location_normalization(RX, RY)
+            elif LOCAL_NORMAL_TYPE == "offset":
+                RX, RY = self.processor.offset_to_origin_normalization(RX, RY)
         return [RX, RY, P]
 
     def reconstructSignature(self, signature):
@@ -395,13 +402,14 @@ class Driver():
                 trainSignatures[personID] = {"genuine": [], "forgery": []}
             trainSignatures[personID]["genuine"].extend(value)
 
-        # For train genuine session2
-        trainGenuineSession2Folder = "../data/SUSig/VisualSubCorpus/GENUINE/SESSION2"
-        trainGenuineSession2SubSigs = self.get_signatures_from_susig_folder(trainGenuineSession2Folder)
-        for (personID, value) in trainGenuineSession2SubSigs.items():
-            if personID not in trainSignatures:
-                trainSignatures[personID] = {"genuine": [], "forgery": []}
-            trainSignatures[personID]["genuine"].extend(value)
+        if MULTI_SESSION:
+            # For train genuine session2
+            trainGenuineSession2Folder = "../data/SUSig/VisualSubCorpus/GENUINE/SESSION2"
+            trainGenuineSession2SubSigs = self.get_signatures_from_susig_folder(trainGenuineSession2Folder)
+            for (personID, value) in trainGenuineSession2SubSigs.items():
+                if personID not in trainSignatures:
+                    trainSignatures[personID] = {"genuine": [], "forgery": []}
+                trainSignatures[personID]["genuine"].extend(value)
 
         trainSets = trainSignatures.values()
 
@@ -431,11 +439,52 @@ class Driver():
         print "test set genuine count: %d" % len(testSets[0]["genuine"])
         print "test set forgery count: %d" % len(testSets[0]["forgery"])
         """
-        return trainSets[0:1], testSets
+
+        if MODE == "TEST":
+            return testSets[:2], trainSets[:2]
+        else:
+            return testSets+trainSets[0:TRAIN_SET_COUNT-10], trainSets[TRAIN_SET_COUNT-10:]
 
     def calculate_delta(self, valueList):
         deltaValueList = [valueList[i] - valueList[i-1] for i in range(1, len(valueList))]
         return deltaValueList
+
+    def test(self):
+        pass
+
+class ClassifyDriver(BaseDriver):
+    def __init__(self):
+        super(ClassifyDriver, self).__init__()
+
+        if CLASSIFIER == "SVM":
+            self.driver = svm.SVC()
+        elif CLASSIFIER == "GBC":
+            self.driver = GradientBoostingClassifier(n_estimators=300, max_depth=5, learning_rate=0.05)
+        elif CLASSIFIER == "RFC":
+            self.driver = RandomForestClassifier(n_estimators=N_ESTIMATORS, n_jobs=N_JOBS)
+        else:
+            raise Exception("Classifier %s not supported" % CLASSIFIER)
+
+        genuineX = []
+        forgeryX = []
+
+        genuineY = []
+        forgeryY = []
+
+        # Training process
+        for sigs in self.train_set:
+            personTrain = PersonTraining(sigs)
+            genuine, forgery = personTrain.calc_train_set()
+            genuineX.extend(genuine)
+            forgeryX.extend(forgery)
+
+        genuineY = [1] * len(genuineX)
+        forgeryY = [0] * len(forgeryX)
+
+        trainX = genuineX + forgeryX
+        trainY = genuineY + forgeryY
+
+        self.driver.fit(trainX, trainY)
 
     def test(self):
         LOGGER.info("Start test")
@@ -446,6 +495,10 @@ class Driver():
         forgery_test_result = []
         genuine_test_result = []
         random_test_result = []
+
+        genuine_test_dis = []
+        forgery_test_dis = []
+
         for i in range(len(test_set)):
             one_test_set = test_set[i]
             LOGGER.info("Test signature: %d" % count)
@@ -458,7 +511,7 @@ class Driver():
             for j in range(len(genuine_set)):
                 sig = genuine_set[j]
                 dis = personTest.calc_dis(sig)
-                res = self.svm.predict(dis)
+                res = self.driver.predict(dis)
                 LOGGER.info("Genuine Test: Result: %s, %s" % (res, dis))
                 genuine_test_result.append(res)
                 if (res != 1):
@@ -467,7 +520,7 @@ class Driver():
             for j in range(len(forgery_set)):
                 sig = forgery_set[j]
                 dis = personTest.calc_dis(sig)
-                res = self.svm.predict(dis)
+                res = self.driver.predict(dis)
                 LOGGER.info("Forgery Test: Result: %s, %s" % (res, dis))
                 forgery_test_result.append(res)
                 if (res != 0):
@@ -488,7 +541,7 @@ class Driver():
                 for j in range(len(random_set)):
                     sig = random_set[j]
                     dis = personTest.calc_dis(sig)
-                    res = self.svm.predict(dis)
+                    res = self.driver.predict(dis)
                     LOGGER.info("Random Test: Result: %s, %s" % (res, dis))
                     random_test_result.append(res)
                     if (res != 0):
@@ -507,12 +560,184 @@ class Driver():
             LOGGER.info("false accepted count: %d" % sum(random_test_result))
             LOGGER.info("false accepted rate: %f" % (1 - sum(random_test_result) / float(len(random_test_result))))
 
+
+class RegressionDriver(BaseDriver):
+    def __init__(self):
+        super(RegressionDriver, self).__init__()
+
+        if REGRESSOR == "LOG":
+            self.driver = LogisticRegression()
+        elif REGRESSOR == "RFR":
+            self.driver = RandomForestRegressor(n_estimators=N_ESTIMATORS, n_jobs=N_JOBS)
+        elif REGRESSOR == "GBR":
+            self.driver = GradientBoostingClassifier(n_estimators=300, max_depth=5, learning_rate=0.05)
+        elif REGRESSOR == "PCA":
+            self.driver = PCA(n_components=1)
+        else:
+            raise Exception("Regressor: %s not supported." % REGRESSOR)
+
+        genuineX = []
+        forgeryX = []
+
+        genuineY = []
+        forgeryY = []
+
+        # Training process
+        for sigs in self.train_set:
+            personTrain = PersonTraining(sigs)
+            genuine, forgery = personTrain.calc_train_set()
+            genuineX.extend(genuine)
+            forgeryX.extend(forgery)
+
+        # To adjust PCA result, 0 means genuine and 1 means forgery
+        genuineY = [0.0] * len(genuineX)
+        forgeryY = [1.0] * len(forgeryX)
+
+        trainX = genuineX + forgeryX
+        trainY = genuineY + forgeryY
+
+        self.driver.fit(trainX, trainY)
+
+    def test(self):
+        LOGGER.info("Start test")
+        count = 1
+        test_set = self.test_set
+        if TRAIN_SET_INCLUDE:
+            test_set.extend(self.train_set)
+        forgery_test_result = []
+        genuine_test_result = []
+        random_test_result = []
+
+        genuine_test_dis = []
+        forgery_test_dis = []
+
+        falseRejectCount = 0
+        falseAcceptSkillCount = 0
+        falseAcceptRandomCount = 0
+
+        for i in range(len(test_set)):
+            one_test_set = test_set[i]
+            LOGGER.info("Test signature: %d" % count)
+            count += 1
+            personTest = PersonTest(one_test_set["genuine"][0:REF_COUNT])
+            genuine_set = one_test_set["genuine"][REF_COUNT:]
+            forgery_set = one_test_set["forgery"]
+            random_set = []
+
+            for j in range(len(genuine_set)):
+                sig = genuine_set[j]
+                dis = personTest.calc_dis(sig)
+                if REGRESSOR == "PCA":
+                    res = self.driver.transform(dis)
+                    res = res.tolist()[0][0]
+                else:
+                    res = self.driver.predict(dis)
+                    res = res.tolist()[0]
+                genuine_test_dis.append(res)
+                LOGGER.info("Genuine Test: Result: %s, %s" % (res, dis))
+                genuine_test_result.append(res)
+                if (res > 0.5):
+                    LOGGER.fatal("FalseReject: uid: %d, sid: %d" % (i, j))
+                    falseRejectCount += 1
+
+            for j in range(len(forgery_set)):
+                sig = forgery_set[j]
+                dis = personTest.calc_dis(sig)
+                if REGRESSOR == "PCA":
+                    res = self.driver.transform(dis)
+                    res = res.tolist()[0][0]
+                else:
+                    res = self.driver.predict(dis)
+                    res = res.tolist()[0]
+                forgery_test_dis.append(res)
+                LOGGER.info("Forgery Test: Result: %s, %s" % (res, dis))
+                forgery_test_result.append(res)
+                if (res <= 0.5):
+                    LOGGER.fatal("FalseAccept: uid: %d, sid: %d" % (i, j))
+                    falseAcceptSkillCount += 1
+
+            if RANDOM_FORGERY_INCLUDE:
+                for j in range(len(test_set)):
+                    if i == j:
+                        continue
+                    random_set.extend(test_set[j]["genuine"])
+                    random_set.extend(test_set[j]["forgery"])
+
+                # train set included
+                for one_train_set in self.train_set:
+                    random_set.extend(one_train_set["genuine"])
+                    random_set.extend(one_train_set["forgery"])
+
+                for j in range(len(random_set)):
+                    sig = random_set[j]
+                    dis = personTest.calc_dis(sig)
+                    if REGRESSOR == "PCA":
+                        res = self.driver.transform(dis)
+                        res = res.tolist()[0][0]
+                    else:
+                        res = self.driver.predict(dis)
+                        res = res.tolist()[0]
+                    forgery_test_dis.append(res)
+                    LOGGER.info("Random Test: Result: %s, %s" % (res, dis))
+                    random_test_result.append(res)
+                    if (res <= 0.5):
+                        LOGGER.fatal("FalseAccept: uid: %d, sig: %d" % (i, j))
+                        falseAcceptRandomCount += 1
+
+        LOGGER.info("genuine test set count: %d" % len(genuine_test_result))
+        LOGGER.info("false reject count: %d" % falseRejectCount)
+        LOGGER.info("false rejected rate: %f" % (float(falseRejectCount) / float(len(genuine_test_result))))
+
+        LOGGER.info("forgery test set count: %d" % len(forgery_test_result))
+        LOGGER.info("false accepted count: %d" % falseAcceptSkillCount)
+        LOGGER.info("false accepted rate: %f" % (float(falseAcceptSkillCount) / float(len(forgery_test_result))))
+
+        if RANDOM_FORGERY_INCLUDE:
+            LOGGER.info("random test set count: %d" % len(random_test_result))
+            LOGGER.info("false accepted count: %d" % falseAcceptRandomCount)
+            LOGGER.info("false accepted rate: %f" % (float(falseAcceptRandomCount) / float(len(random_test_result))))
+
+        # Compute Equal Error Rate
+        genuine_test_dis_list = sorted(genuine_test_dis, reverse=True) # desending order
+        forgery_test_dis_list = sorted(forgery_test_dis) # asending order
+
+        lastGap = 100.0
+        genuineCount = len(genuine_test_dis_list)
+        forgeryCount = len(forgery_test_dis_list)
+        falseRejectRate = None
+        falseAcceptRate = None
+        for i in range(genuineCount):
+            pivotal = genuine_test_dis_list[i]
+            falseRejectRate = float(i) / genuineCount
+            j = 0
+            while j < forgeryCount and forgery_test_dis_list[j] <= pivotal:
+                j += 1
+            falseAcceptRate = float(j) / forgeryCount
+            gap = abs(falseAcceptRate - falseRejectRate)
+            if gap == 0.0:
+                break;
+            elif gap < lastGap:
+                lastGap = gap
+            else:
+                break
+        LOGGER.info("falseRejectRate: %f, falseAcceptRate: %f, gap: %f" % (falseRejectRate, falseAcceptRate, lastGap))
+        LOGGER.info("TestResultGenuine : %s" % genuine_test_dis)
+        LOGGER.info("TestResultForgery : %s" % forgery_test_dis)
+
 def test_DTW():
     start = time.time()
-    driver = Driver()
-    driver.test()
+    if ClassifyOrRegression == "Classify":
+        driver = ClassifyDriver()
+        driver.test()
+    else:
+        driver = RegressionDriver()
+        driver.test()
     end = time.time()
     LOGGER.info("Total time : %f" % (end - start))
 
 if __name__ == "__main__":
-   test_DTW() 
+    try:
+        test_DTW() 
+    except Exception as e:
+        LOGGER.error("Exception %s" % e)
+        LOGGER.exception("message")
