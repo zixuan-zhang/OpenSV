@@ -13,3 +13,12 @@ USER_COUNT = 40
 
 # AutoEncoder settings
 MAX_EPOCH = 1000
+
+ModeTest= "TEST"
+ModeNormal = "Normal"
+
+Classify = "Classify"
+Regression = "Regression"
+
+Self = "Self"
+SUSIG = "SUSIG"
