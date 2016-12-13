@@ -14,7 +14,6 @@ import numpy
 import itertools
 import matplotlib.pyplot as plt
 
-import utils
 import settings
 from driver import AutoEncoderDriver, SimilarityDriver
 from processor import PreProcessor
@@ -115,10 +114,25 @@ def auto_feature_similarity_view(uid, cnt):
     plt.scatter(forgedSigOthX, forgedSigOthDis, color="black")
     plt.show()
 
+
 def display_original_signature(uid, sid):
+    def _get_data_from_file(filePath):
+        with open(filePath) as fp:
+            lines = fp.readlines()
+            X = []
+            Y = []
+            T = []
+            P = []
+            for line in lines[1:]:
+                items = line.split()
+                X.append(float(items[0]))
+                Y.append(float(items[1]))
+                T.append(int(items[2]))
+                P.append(float(items[6]))
+        return X, Y, T, P
     folder = "../data/Task2"
     fileName = "%s/U%dS%d.TXT" % (folder, uid+1, sid+1)
-    X, Y, T, P = utils.get_data_from_file(fileName)
+    X, Y, T, P = _get_data_from_file(fileName)
     return X, Y
     # plt.scatter(X, Y)
     # plt.suptitle(fileName)
