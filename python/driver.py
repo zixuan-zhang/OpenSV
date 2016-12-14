@@ -355,10 +355,10 @@ class RegressionDriver(BaseDriver):
                     res = self.driver.predict(dis)
                     res = res.tolist()[0]
                 genuine_test_dis.append(res)
-                self.config.logger.info("Genuine Test: Result: %s, %s" % (res, dis))
+                self.config.logger.debug("Genuine Test: Result: %s, %s" % (res, dis))
                 genuine_test_result.append(res)
                 if (res > 0.5):
-                    self.config.logger.fatal("FalseReject: uid: %d, sid: %d" % (i, j))
+                    self.config.logger.debug("FalseReject: uid: %d, sid: %d" % (i, j))
                     falseRejectCount += 1
 
             for j in range(len(forgery_set)):
@@ -371,10 +371,10 @@ class RegressionDriver(BaseDriver):
                     res = self.driver.predict(dis)
                     res = res.tolist()[0]
                 forgery_test_dis.append(res)
-                self.config.logger.info("Forgery Test: Result: %s, %s" % (res, dis))
+                self.config.logger.debug("Forgery Test: Result: %s, %s" % (res, dis))
                 forgery_test_result.append(res)
                 if (res <= 0.5):
-                    self.config.logger.fatal("FalseAccept: uid: %d, sid: %d" % (i, j))
+                    self.config.logger.debug("FalseAccept: uid: %d, sid: %d" % (i, j))
                     falseAcceptSkillCount += 1
 
             if self.config.RandomForgeryInclude:
@@ -399,10 +399,10 @@ class RegressionDriver(BaseDriver):
                         res = self.driver.predict(dis)
                         res = res.tolist()[0]
                     forgery_test_dis.append(res)
-                    self.config.logger.info("Random Test: Result: %s, %s" % (res, dis))
+                    self.config.logger.debug("Random Test: Result: %s, %s" % (res, dis))
                     random_test_result.append(res)
                     if (res <= 0.5):
-                        self.config.logger.fatal("FalseAccept: uid: %d, sig: %d" % (i, j))
+                        self.config.logger.debug("FalseAccept: uid: %d, sig: %d" % (i, j))
                         falseAcceptRandomCount += 1
 
         self.config.logger.info("genuine test set count: %d" % len(genuine_test_result))
