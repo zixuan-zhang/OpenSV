@@ -44,13 +44,18 @@ class Person(object):
                 if i == j:
                     continue
                 comDisList = []
+                totalWeight = 0.0
                 for com in self.config.SigCompList:
                     signal1 = self.refSigs[i][com]
                     signal2 = self.refSigs[j][com]
                     signal1 = _size_norm(signal1)
                     signal2 = _size_norm(signal2)
-                    comDisList.append(self.naive_dtw(signal1, signal2, self.config.Penalization[com], self.config.Threshold[com]))
-                dis += numpy.mean(comDisList)
+                    comDisList.append(self.naive_dtw(signal1, signal2,
+                        self.config.Penalization[com], self.config.Threshold[com]) * \
+                                self.config.SignalWeight[com])
+                    totalWeight += self.config.SignalWeight[com]
+                dis += (sum(comDisList) / totalWeight)
+                exit(0)
             refDis.append(dis)
 
         self.templateIndex = refDis.index(min(refDis))

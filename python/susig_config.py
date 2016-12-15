@@ -1,5 +1,6 @@
 #coding:utf-8
 
+import os
 import datetime
 import logging
 
@@ -25,6 +26,8 @@ class SUSIGConfig(object):
 
         #### Log configurations
         logFolder = "../data/susig_log"
+        if not os.path.exists(logFolder):
+            os.makedirs(logFolder)
         logFileName = datetime.datetime.now().strftime("%Y%m%d%H%M%S.log")
         logFormat = '%(asctime)s %(levelname)s %(name)s %(message)s'
         logging.basicConfig(filename = "%s/%s" % (logFolder, logFileName), level = logging.DEBUG, format = logFormat)
@@ -36,10 +39,19 @@ class SUSIGConfig(object):
         #### Classification and regression configurations.
         self.ClassifyOrRegression = settings.Classify
         self.Classifier = "RFC" # "RFC", "GBC", "SVM", "MLP", "Logi"
-        self.Regressor = "LOG" # RFR, LOG, "GBR", PCA, MLP
+        self.Regressor = "RFR" # RFR, LOG, "GBR", PCA, MLP
 
         #### Signal configurations
-        self.SigCompList = ["VX"]
+        self.SigCompList = ["VX", "VY", "P"]
+
+        #### Signal weight when selecting template signature
+        self.SignalWeight = {
+                "X" : 1.,
+                "Y" : 1.,
+                "VX": 1.,
+                "VY": 1.,
+                "P" : 1.
+                }
 
         #### Feature settings
         self.FeatureType = {

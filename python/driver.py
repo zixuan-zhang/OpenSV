@@ -26,9 +26,9 @@ class BaseDriver(object):
         self.config.logger.info("Forgery count in test set : %d" % len(testSets[0]["forgery"]))
 
     def pre_process_for_signle_signature(self, signature):
-        RX = signature[0]
-        RY = signature[1]
-        P  = signature[2]
+        T  = signature["T"]
+        RX = signature["X"]
+        RY = signature["Y"]
         if self.config.PreProcessorSwitch:
             if self.config.SizeNormSwitch:
                 RX, RY = self.processor.size_normalization(RX, RY, 400, 200)
@@ -36,24 +36,36 @@ class BaseDriver(object):
                 RX, RY = self.processor.location_normalization(RX, RY)
             elif self.config.LocalNormalType== "offset":
                 RX, RY = self.processor.offset_to_origin_normalization(RX, RY)
-        return [RX, RY, P]
+            signature["X"] = RX
+            signature["Y"] = RY
+        return signature
 
     def reconstructSignature(self, signature):
         """
         Reconstruct signature to dictionary like object
         """
-        def _calculate_delta(valueList):
-            deltaValueList = [valueList[i] - valueList[i-1] for i in range(1, len(valueList))]
-            return deltaValueList
+        def _calculate_delta(T, valueList):
+            """
+            This function just calculate the derivatives of valueList.
+            """
+            assert len(T) == len(valueList)
+            newValueList = []
+            for i in range(1, len(T)):
+                slot = T[i] - T[i-1]
+                value = (valueList[i] - valueList[i-1]) / slot \
+                        if slot != 0 else None
+                if value:
+                    newValueList.append(value)
+            return newValueList
 
-        X = signature[0]
-        Y = signature[1]
-        P = signature[2]
-        VX = _calculate_delta(X)
-        VY = _calculate_delta(Y)
-        signature = {"X": X, "Y": Y, "P": P, "VX": VX, "VY": VY}
+        T = signature["T"]
+        X = signature["X"]
+        Y = signature["Y"]
+        VX = _calculate_delta(T, X)
+        VY = _calculate_delta(T, Y)
+        signature["VX"] = VX
+        signature["VY"] = VY
         return signature
-
 
     def get_signatures_from_susig(self):
         """
@@ -65,24 +77,25 @@ class BaseDriver(object):
             signatures = {}
             for fileName in os.listdir(folder):
                 filePath = os.path.join(folder, fileName)
+                signature = {"T": [], "X": [], "Y": [], "P": []}
                 with open(filePath) as fp:
                     lines = fp.readlines()
-                    X = []
-                    Y = []
-                    T = []
-                    P = []
                     for line in lines[2:]:
+                        line = line.strip()
+                        if not line:
+                            continue
                         items = line.split()
-                        X.append(float(items[0]))
-                        Y.append(float(items[1]))
-                        T.append(float(items[2]))
-                        P.append(float(items[3]))
+                        signature["X"].append(float(items[0]))
+                        signature["Y"].append(float(items[1]))
+                        signature["T"].append(float(items[2]))
+                        signature["P"].append(float(items[3]))
                     personID = fileName.split(".")[0].split("_")[0]
                     if personID not in signatures:
                         signatures[personID] = []
-                    signature = self.pre_process_for_signle_signature([X, Y, P])
+                    signature = self.pre_process_for_signle_signature(signature)
                     signature = self.reconstructSignature(signature)
                     signatures[personID].append(signature)
+
             return signatures
         self.config.logger.info("Getting signatures from susig")
         trainSignatures = {}
@@ -145,27 +158,24 @@ class BaseDriver(object):
             signatures = {}
             for fileName in os.listdir(folder):
                 filePath = os.path.join(folder, fileName)
+                signature = {"T": [], "X": [], "Y": [], "P": []}
                 with open(filePath) as fp:
                     lines = fp.readlines()
-                    T = []
-                    X = []
-                    Y = []
-                    P = []
                     for line in lines:
                         line = line.strip()
                         if not line:
                             continue
                         items = line.split()
-                        T.append(float(items[0]))
-                        X.append(float(items[1]))
-                        Y.append(float(items[2]))
-                        P.append(float(items[3]))
-                    maxY = max(Y)
-                    Y = [maxY - y for y in Y]
+                        signature["T"].append(float(items[0]))
+                        signature["X"].append(float(items[1]))
+                        signature["Y"].append(float(items[2]))
+                        signature["P"].append(float(items[3]))
+                    maxY = max(signature["Y"])
+                    signature["Y"] = [maxY - y for y in signature["Y"]]
                     personID = fileName.split("_")[0]
                     if personID not in signatures:
                         signatures[personID] = []
-                    signature = self.pre_process_for_signle_signature([X, Y, P])
+                    signature = self.pre_process_for_signle_signature(signature)
                     signature = self.reconstructSignature(signature)
                     signatures[personID].append(signature)
             return signatures
