@@ -55,7 +55,6 @@ class Person(object):
                                 self.config.SignalWeight[com])
                     totalWeight += self.config.SignalWeight[com]
                 dis += (sum(comDisList) / totalWeight)
-                exit(0)
             refDis.append(dis)
 
         self.templateIndex = refDis.index(min(refDis))
