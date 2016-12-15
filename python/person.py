@@ -28,6 +28,14 @@ class Person(object):
             Just select template signature.
             TODO: different signal with variant weight
         """
+        def _size_norm(values):
+            minValue = min(values)
+            maxValue = max(values)
+            _range = maxValue - minValue
+            mV = 100.
+            values = [mV * (v - minValue) / _range for v in values]
+            return values
+
         self.config.logger.info("selecting template signature")
         refDis = []
         for i in range(self.refCount):
@@ -39,6 +47,8 @@ class Person(object):
                 for com in self.config.SigCompList:
                     signal1 = self.refSigs[i][com]
                     signal2 = self.refSigs[j][com]
+                    signal1 = _size_norm(signal1)
+                    signal2 = _size_norm(signal2)
                     comDisList.append(self.naive_dtw(signal1, signal2, self.config.Penalization[com], self.config.Threshold[com]))
                 dis += numpy.mean(comDisList)
             refDis.append(dis)
