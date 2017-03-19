@@ -24,14 +24,14 @@ from thrift.server import TServer
 from opensv import HandWriter
 from opensv.ttypes import Point, Signature, Request, Ret, ErrorCode
 
-from self_config import SelConfig
+from self_config import SelfConfig
 from driver import HandWriterDriver
 
 
 class HandWriterHandler:
     def __init__(self):
         config = SelfConfig()
-        self.driver = handWriterDriver(config)
+        self.driver = HandWriterDriver(config)
     
     def ping(self, num):
         print "Receive ping() request, num is %d" % num
@@ -47,7 +47,7 @@ class HandWriterHandler:
         # TODO: futher check of signature quality
 
         # Forward driver to process
-        driver.register(account_id, signatures)
+        self.driver.accountRegister(account_id, signatures)
 
     def verify(self, request):
         print "Receive verify() request"
@@ -56,8 +56,8 @@ class HandWriterHandler:
         if len(signatures) < 1:
             return Ret(False, ErrorCode.TestSignatureNotFound)
         signature = signatures[0]
-        bool res = self.driver.verify(account_id, signature)
-        return Ret(ret, None)
+        res = self.driver.verify(account_id, signature)
+        return Ret(res, None)
 
     def _extract_signatures(self, request):
         signatures = []
@@ -76,7 +76,7 @@ class HandWriterHandler:
             signature = {
                     "T": t_list,
                     "X": x_list,
-                    "Y": y_ist,
+                    "Y": y_list,
                     "P": p_list}
             signatures.append(signature)
         return signatures

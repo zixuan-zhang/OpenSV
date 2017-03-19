@@ -5,7 +5,7 @@ import cPickle
 
 import settings
 import processor
-from person import PersonTraining, PersonTest
+from person import PersonTest
 from database import SignatureStorage
 
 class HandWriterDriver(object):
@@ -19,7 +19,7 @@ class HandWriterDriver(object):
         # Pre process signature and then reconsturct them
         for sig in signatures:
             self._pre_process_for_signle_signature(sig)
-            self._reconstructSignature(sig)
+            self._reconstruct_signature(sig)
         self.database.save(account, signatures)
 
     def verify(self, account, test_signature):
@@ -27,11 +27,11 @@ class HandWriterDriver(object):
 
         reference_signatures = self.database.load(account)
         test_signature = self._pre_process_for_signle_signature(test_signature)
-        test_signature = self._reconstructSignature(test_signature)
+        test_signature = self._reconstruct_signature(test_signature)
         reference_signatures = None
         personTest = PersonTest(self.config, reference_signatures)
-        features = personTest.calc_dis(sig)
-        res = self.driver.predict(features)
+        features = personTest.calc_dis(test_signature)
+        res = self.model.predict(features)
         return True if res == 1 else False
 
     def _load_model(self):
