@@ -1,6 +1,7 @@
 #coding=utf-8
 
 import os
+import cPickle
 
 import settings
 import processor
@@ -228,6 +229,9 @@ class ClassifyDriver(BaseDriver):
         trainY = genuineY + forgeryY
 
         self.driver.fit(trainX, trainY)
+        with open(self.config.ModelDumpFilePath) as fp:
+            cPickle.dump(self.driver, fp)
+
 
     def test(self):
         self.config.logger.info("Start test")

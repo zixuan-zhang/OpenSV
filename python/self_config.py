@@ -20,7 +20,7 @@ from sklearn.linear_model import LogisticRegression
 class SelfConfig(object):
     """
         SUSIG dataset configurations.
-        All global configuration variables are start with uppercase letters.
+        All global configuration variables start with uppercase letters.
     """
     def __init__(self):
 
@@ -30,19 +30,29 @@ class SelfConfig(object):
             os.makedirs(logFolder)
         logFileName = datetime.datetime.now().strftime("%Y%m%d%H%M%S.log")
         logFormat = '%(asctime)s %(levelname)s %(name)s %(message)s'
-        logging.basicConfig(filename = "%s/%s" % (logFolder, logFileName), level = logging.DEBUG, format = logFormat)
+        logging.basicConfig(filename = "%s/%s" % (logFolder, logFileName), level = logging.INFO, format = logFormat)
         self.logger = logging.getLogger()
 
         #### Mode configuration just indicates use total dataset or partial dataset.
-        self.Mode = settings.ModeTest
+        self.Mode = settings.ModeNormal
 
         #### Classification and regression configurations.
-        self.ClassifyOrRegression = settings.Regression
+        self.ClassifyOrRegression = settings.Classify
         self.Classifier = "RFC" # "RFC", "GBC", "SVM", "MLP", "Logi"
         self.Regressor = "LOG" # RFR, LOG, "GBR", PCA, MLP
+        self.ModelDumpFilePath = "../data/self_model.dump"
 
         #### Signal configurations
-        self.SigCompList = ["VX"]
+        self.SigCompList = ["X", "Y", "VX", "VX", "VY"]
+
+        #### Signal weight when selecting template signature
+        self.SignalWeight = {
+                "X" : 1.,
+                "Y" : 1.,
+                "VX": 1.,
+                "VY": 1.,
+                "P" : 1.
+                }
 
         #### Feature settings
         self.FeatureType = {
