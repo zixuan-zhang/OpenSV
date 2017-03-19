@@ -7,6 +7,7 @@ import settings
 import processor
 from person import PersonTest
 from database import SignatureStorage
+from opensv.ttypes import Ret, ErrorCode
 
 class HandWriterDriver(object):
     def __init__(self, config):
@@ -21,18 +22,21 @@ class HandWriterDriver(object):
             self._pre_process_for_signle_signature(sig)
             self._reconstruct_signature(sig)
         self.database.save(account, signatures)
+        return Ret(True, None)
 
     def verify(self, account, test_signature):
         # TODO: get reference signatures from db.
 
         reference_signatures = self.database.load(account)
+        if not reference_signatures:
+            return Ret(False, ErrorCode.ReferenceSignatureShortage)
         test_signature = self._pre_process_for_signle_signature(test_signature)
         test_signature = self._reconstruct_signature(test_signature)
         reference_signatures = None
         personTest = PersonTest(self.config, reference_signatures)
         features = personTest.calc_dis(test_signature)
         res = self.model.predict(features)
-        return True if res == 1 else False
+        return Ret(res, None)
 
     def _load_model(self):
         # TODO: load trained model.

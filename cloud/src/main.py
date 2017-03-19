@@ -47,7 +47,7 @@ class HandWriterHandler:
         # TODO: futher check of signature quality
 
         # Forward driver to process
-        self.driver.accountRegister(account_id, signatures)
+        return self.driver.accountRegister(account_id, signatures)
 
     def verify(self, request):
         print "Receive verify() request"
@@ -56,8 +56,7 @@ class HandWriterHandler:
         if len(signatures) < 1:
             return Ret(False, ErrorCode.TestSignatureNotFound)
         signature = signatures[0]
-        res = self.driver.verify(account_id, signature)
-        return Ret(res, None)
+        return self.driver.verify(account_id, signature)
 
     def _extract_signatures(self, request):
         signatures = []
