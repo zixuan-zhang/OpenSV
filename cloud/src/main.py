@@ -13,7 +13,7 @@ import time
 
 logging.basicConfig()
 
-sys.path.insert("gen-py")
+sys.path.insert(0, "gen-py")
 # sys.path.insert(0, glob.glob("../../lib/py/build/lib*")[0])
 
 from thrift.transport import TSocket
@@ -24,13 +24,13 @@ from thrift.server import TServer
 from opensv import HandWriter
 from opensv.ttypes import Point, Signature, Request, Ret, ErrorCode
 
-from self_config import SelfConfig
+from config import Config
 from driver import HandWriterDriver
 
 
 class HandWriterHandler:
     def __init__(self):
-        config = SelfConfig()
+        config = Config()
         self.driver = HandWriterDriver(config)
     
     def ping(self, num):

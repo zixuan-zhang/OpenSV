@@ -12,7 +12,7 @@ from opensv.ttypes import Ret, ErrorCode
 class HandWriterDriver(object):
     def __init__(self, config):
         self.config = config
-        self.database = SignatureStorage()
+        self.database = SignatureStorage(config)
         self.model = self._load_model()
         self.processor = processor.PreProcessor()
 
@@ -30,9 +30,10 @@ class HandWriterDriver(object):
         reference_signatures = self.database.load(account)
         if not reference_signatures:
             return Ret(False, ErrorCode.ReferenceSignatureShortage)
+        print reference_signatures
+        print "reference signature count : %d" % len(reference_signatures)
         test_signature = self._pre_process_for_signle_signature(test_signature)
         test_signature = self._reconstruct_signature(test_signature)
-        reference_signatures = None
         personTest = PersonTest(self.config, reference_signatures)
         features = personTest.calc_dis(test_signature)
         res = self.model.predict(features)

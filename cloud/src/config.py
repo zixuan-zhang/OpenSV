@@ -17,7 +17,7 @@ from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.decomposition import PCA
 from sklearn.linear_model import LogisticRegression
 
-class SelfConfig(object):
+class Config(object):
     """
         SUSIG dataset configurations.
         All global configuration variables are start with uppercase letters.
@@ -44,6 +44,15 @@ class SelfConfig(object):
 
         #### Signal configurations
         self.SigCompList = ["X", "Y", "VX", "VY", "P"]
+
+        #### Signal weight
+        self.SignalWeight = {
+                "X" : 1.,
+                "Y" : 1.,
+                "VX": 1.,
+                "VY": 1.,
+                "P" : 1.
+                }
 
         #### Feature settings
         self.FeatureType = {
@@ -103,6 +112,12 @@ class SelfConfig(object):
         self.RFTNumEstimators = 200
         self.RFTMinSamplesLeaf = 1
         self.RFTNumJobs = 1
+
+        #### Database settings
+        self.DatabaseIP = "127.0.0.1"
+        self.DatabasePort = 27017
+        self.DatabaseName = "test"
+        self.DatabaseTableName = "test"
 
         self.model = None
 
