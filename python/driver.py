@@ -229,7 +229,7 @@ class ClassifyDriver(BaseDriver):
         trainY = genuineY + forgeryY
 
         self.driver.fit(trainX, trainY)
-        with open(self.config.ModelDumpFilePath) as fp:
+        with open(self.config.ModelDumpFilePath, "w") as fp:
             cPickle.dump(self.driver, fp)
 
 

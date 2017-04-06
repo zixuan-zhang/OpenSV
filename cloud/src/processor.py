@@ -10,9 +10,6 @@
 
 import numpy
 
-from exception import ParamErrorException
-from decorators import param_length_matcher
-
 class PreProcessor(object):
     """
         本类提供了数据处理的一些函数
