@@ -21,7 +21,7 @@ struct Signature {
 }
 
 struct Request {
-   1: i32 id,
+   1: string id,
    2: list<Signature> signatures,
 }
 

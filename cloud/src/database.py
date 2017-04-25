@@ -16,10 +16,10 @@ class SignatureStorage(object):
         self.table = db[self.config.DatabaseTableName]
 
     def save(self, _id, signatures):
-        self.table.find_one_and_update({"_id": _id}, {"$set": {"signatures": signatures}}, upsert=True)
+        self.table.find_one_and_update({"name": _id}, {"$set": {"signatures": signatures}}, upsert=True)
 
     def load(self, _id):
-        cursor = self.table.find({"_id": _id})
+        cursor = self.table.find({"name": _id})
         if cursor.count() == 0:
             return None
         signatures = cursor[0]["signatures"]

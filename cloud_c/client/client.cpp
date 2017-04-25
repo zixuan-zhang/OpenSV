@@ -35,15 +35,15 @@ int main() {
         Request request;
         request.id = 123;
         vector<Signature> signatures;
-        for (int i = 0; i < 2; ++i) {
+        for (int i = 0; i < 5; ++i) {
             Signature signature;
             vector<Point> points;
-            for (int i = 0; i < 4; ++i) {
+            for (int j = 0; j < 4; ++j) {
                 Point point;
-                point.t = i * 1;
-                point.x = i * 1;
-                point.y = i * 1;
-                point.p = i * 1;
+                point.t = i * j * 1;
+                point.x = i * j * 15 + 71;
+                point.y = i * j * 32 + 71;
+                point.p = i * j * 10 + 71;
                 points.push_back(point);
             }
             signature.points = points;
@@ -52,6 +52,31 @@ int main() {
         request.signatures = signatures;
         Ret ret;
         client.accountRegister(ret, request);
+        cout<<ret.success<<endl;
+        cout<<ret.error<<endl;
+
+        Request verifyRequest;
+        request.id = 123;
+        vector<Signature> verifySignatures;
+        for (int i = 0; i < 1; ++i) {
+            Signature signature;
+            vector<Point> points;
+            for (int i = 0; i < 4; ++i) {
+                Point point;
+                point.t = i;
+                point.x = i * 20 + 17;
+                point.y = i * 15 + 17;
+                point.p = i * 32 + 17;
+                points.push_back(point);
+            }
+            signature.points = points;
+            verifySignatures.push_back(signature);
+        }
+        request.signatures = signatures;
+        Ret verifyRet;
+        client.verify(verifyRet, request);
+        cout<<verifyRet.success<<endl;
+        cout<<verifyRet.error<<endl;
 
     } catch (TException& tx) {
         cout<<"Error: "<<tx.what()<<endl;
